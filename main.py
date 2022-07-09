@@ -34,7 +34,7 @@ class Vector:
         return (self.x, self.y)
     def __str__(self):
         return 'Just Vector :)'
-
+# test comment
 class Entity:
     def __init__(self, pos = None, rot = None, color = WHITE):
         if not pos:
