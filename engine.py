@@ -17,10 +17,23 @@ def empty():
 
 class Screen:
     all_entities = []
+
+    FPS = 30
+
     width, height = 1000, 800
+    def_width, def_height = width, height
     tk = Tk()
     canvas = Canvas(width = width, height = height, bg = BLACK, highlightthickness=0)
     canvas.pack()
+    def fullscreen(state = True):
+        if state:
+            Screen.tk.attributes('-fullscreen', True)
+            screen_width = Screen.tk.winfo_screenwidth()
+            screen_height = Screen.tk.winfo_screenheight()
+            Screen.setSize(screen_width, screen_height, defValue = False)
+        else:
+            Screen.tk.attributes('-fullscreen', False)
+            Screen.setSize(Screen.def_width, Screen.def_height)
     def run(update = empty):
         while 1:
             core_Engine_update(update)
@@ -28,6 +41,11 @@ class Screen:
         Screen.tk.update_idletasks()
         Screen.tk.update()
         Screen.canvas.delete('all')
+    def setSize(width, height, defValue = True):
+        if defValue:
+            Screen.def_width, Screen.def_height = width, height
+        Screen.width, Screen.height = width, height
+        Screen.canvas.configure(width = width, height = height)
 
 class InputManager:
     def __init__(self):
@@ -76,7 +94,7 @@ class Vector:
             y = self.y - other.y
             return x, y
 class Entity:
-    def __init__(self, pos = None, rot = 0, color = WHITE, mass = 4):
+    def __init__(self, pos = None, rot = 0, color = WHITE, mass = 5, tag = None):
         # if not pos:
         #     pos = Vector(0, 0)
         self.position = pos
@@ -86,7 +104,7 @@ class Entity:
         self.collider = False
         self.collided = False
 
-        self.tag = None
+        self.tag = tag
 
         self.accX = 0
         self.accY = 0
@@ -97,15 +115,20 @@ class Entity:
 
         Screen.all_entities.append(self)
     def gravity(self):
-        self.force(0, self.mass*g)
-    def force(self, x, y):
-        fX = x / Vector.unit / 100
-        fY = y / Vector.unit / 100
+        self.force((0, self.mass / 1000 * g))
+    def force(self, pos):
+        if type(pos) == tuple:
+            x, y = pos
+        if type(pos) == Vector:
+            x, y = pos.getPosition()
+        
+        fX = x / Vector.unit * 10
+        fY = y / Vector.unit * 10
         self.accX += fX
         self.accY += fY
 class Square(Entity):
-    def __init__(self, pos = copy(Vector(0, 0)), rot = 0, scale = None, color = WHITE):
-        super().__init__(pos, rot, color)
+    def __init__(self, pos = copy(Vector(0, 0)), rot = 0, scale = None, color = WHITE, mass = 5, tag = None):
+        super().__init__(pos, rot, color, mass, tag)
         if not scale:
             scale = Vector(1, 1)
         self.scale = scale
@@ -116,15 +139,18 @@ class Square(Entity):
     def update(self):
         # if self.collider:
         #     for __ent_ in all_entities:
-        if not self.collided:
-            self.velX += self.accX
-            self.velY += self.accY
-            # if abs(self.velX) >= 0.5:
-            self.position.x += self.velX
-            # if abs(self.velY) >= 0.5:
-            self.position.y += self.velY
-            self.accX = 0
+        self.velX += self.accX
+        if self.collided and self.velY > 0:
             self.accY = 0
+            self.velY = 0
+        self.velY += self.accY
+        print(self.collided, self.accY, self.velY)
+        # if abs(self.velX) >= 0.5:
+        self.position.x += self.velX
+        # if abs(self.velY) >= 0.5:
+        self.position.y += self.velY
+        self.accX = 0
+        self.accY = 0
                 
         for v in self.verticies:
             rotated = matrix.multiply(matrix.rotation(self.rotation - self.last_rotation), v.getPosition())
@@ -209,6 +235,6 @@ def core_Engine_update(update):
     update()
 
     time2 = time()
-    tick(time1, time2, 30)
+    tick(time1, time2, Screen.FPS)
 
     Screen.refresh()
