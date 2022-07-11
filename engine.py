@@ -2,7 +2,7 @@ from tkinter import *
 from time import sleep, time
 from keyboard import is_pressed
 import matrix
-from math import radians, degrees
+from math import radians, degrees, sqrt
 from copy import copy
 
 def tick(time1, time2, FPS):
@@ -19,6 +19,8 @@ class Screen:
     all_entities = []
 
     FPS = 30
+
+    g = 9.8
 
     width, height = 1000, 800
     def_width, def_height = width, height
@@ -72,11 +74,11 @@ class Vector:
         if type(other) == Vector:
             x = self.x + other.x
             y = self.y + other.y
-            return x, y
+            return Vector(x, y)
+    def __radd__(self, other):
+        self.__add__(other)
     def __repr__(self) -> tuple:
         return (self.x, self.y)
-    def __str__(self):
-        return 'Just Vector :)'
     def __mul__(self, other):
         if type(other) == Vector:
             x = self.x * other.x
@@ -92,17 +94,20 @@ class Vector:
         if type(other) == Vector:
             x = self.x - other.x
             y = self.y - other.y
-            return x, y
+            return Vector(x, y)
+    def __rsub__(self, other):
+        self.__sub__(other)
+    def __str__(self):
+        return str(self.x) + ', ' + str(self.y)
 class Entity:
     def __init__(self, pos = None, rot = 0, color = WHITE, mass = 5, tag = None):
-        # if not pos:
-        #     pos = Vector(0, 0)
         self.position = pos
         self.rotation = rot
         self.color = color
 
         self.collider = False
         self.collided = False
+        self.colliding_objects = 'all'
 
         self.tag = tag
 
@@ -111,11 +116,15 @@ class Entity:
         self.velX = 0
         self.velY = 0
 
+        self.move_y = None
+
+        self.have_gravity = False
+
         self.mass = mass
 
         Screen.all_entities.append(self)
     def gravity(self):
-        self.force((0, self.mass / 1000 * g))
+        self.force((0, -self.mass / 1000 * Screen.g))
     def force(self, pos):
         if type(pos) == tuple:
             x, y = pos
@@ -126,7 +135,7 @@ class Entity:
         fY = y / Vector.unit * 10
         self.accX += fX
         self.accY += fY
-class Square(Entity):
+class Rectangle(Entity):
     def __init__(self, pos = copy(Vector(0, 0)), rot = 0, scale = None, color = WHITE, mass = 5, tag = None):
         super().__init__(pos, rot, color, mass, tag)
         if not scale:
@@ -137,31 +146,70 @@ class Square(Entity):
         self.verticies = [Vector(x, y) for x in [-scale.x/2, scale.x/2] for y in [-scale.y/2, scale.y/2]]
         self.verticies[2], self.verticies[3] = self.verticies[3], self.verticies[2]
     def update(self):
-        # if self.collider:
-        #     for __ent_ in all_entities:
-        self.velX += self.accX
-        if self.collided and self.velY > 0:
+        if self.have_gravity:
+            if self.colliding_objects == 'all':
+                for _entity in Screen.all_entities:
+                    if self.collision(_entity):
+                        self.collided = True
+                        break
+                    self.collided = False
+            if not self.collided:
+                self.gravity()
+        
+        if self.have_gravity and not self.collided:
+            gravity_casts = []
+            verticies_g = []
+            last_v = Vector(0, 0)
+            for v in self.verticies:
+                if v.y <= last_v.y and len(gravity_casts) < 3:
+                    ray = raycaster.ray(v + self.position, Vector(0, -1))
+                    
+                    gravity_casts.append(ray)
+                    verticies_g.append(v)
+                    last_v = v
+            rays_y = [ray.y for ray in gravity_casts if ray != None]
+            if len(rays_y) and not self.collided:
+                self.move_y = max(rays_y)
+                index = rays_y.index(self.move_y)
+                v = verticies_g[index]
+                self.move_y -= v.y + 1/Vector.unit
+        
+        if self.collided and self.velY < 0:
             self.accY = 0
             self.velY = 0
+        self.velX += self.accX
         self.velY += self.accY
-        print(self.collided, self.accY, self.velY)
-        # if abs(self.velX) >= 0.5:
+
         self.position.x += self.velX
-        # if abs(self.velY) >= 0.5:
         self.position.y += self.velY
+
         self.accX = 0
         self.accY = 0
-                
+
+        print(self.collided, self.position)
+        if self.have_gravity:
+            if self.colliding_objects == 'all':
+                for _entity in Screen.all_entities:
+                    if self.collision(_entity):
+                        self.collided = True
+                        break
+                    self.collided = False
+
+        if self.collided and self.move_y != None:
+            self.position.y = self.move_y
+            self.move_y = None
+        
         for v in self.verticies:
             rotated = matrix.multiply(matrix.rotation(self.rotation - self.last_rotation), v.getPosition())
             v.x, v.y = rotated[0][0], rotated[1][0]
         self.last_rotation = self.rotation
+        
         self.draw()
     def draw(self):
-        draw_verticies = [pos2 for pos in self.verticies for pos2 in pos.__repr__()]   
-        for i, v in enumerate(draw_verticies):
+        draw_verticies = [pos2 for pos in self.verticies for pos2 in pos.__repr__()]
+        for i in range(len(draw_verticies)):
             if i % 2:
-                draw_verticies[i] += self.position.y
+                draw_verticies[i] += -self.position.y
             else:
                 draw_verticies[i] += self.position.x
             draw_verticies[i] *= Vector.unit
@@ -171,7 +219,6 @@ class Square(Entity):
                 draw_verticies[i] += Screen.width//2
         Screen.canvas.create_polygon(draw_verticies, fill = self.color)
     def collision(self, other):
-        self.collided = False
         for i, v1 in enumerate(other.verticies):
             x1 = v1.x + other.position.x
             y1 = v1.y + other.position.y
@@ -191,7 +238,6 @@ class Square(Entity):
                 t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
                 u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
                 if 1 > t > 0 and 1 > u > 0:
-                    self.collided = True
                     return True
 
 class Raycast:
@@ -202,8 +248,11 @@ class Raycast:
         x4 = start_point.x + dir.x
         y4 = start_point.y + dir.y
 
+        last_pt = None
+
         for other in Screen.all_entities:
             for i, v1 in enumerate(other.verticies):
+                # print(v1.__repr__())
                 x1 = v1.x + other.position.x
                 y1 = v1.y + other.position.y
                 x2 = other.verticies[(i+1) % 4].x + other.position.x
@@ -214,15 +263,21 @@ class Raycast:
                 if (den == 0):
                     continue
 
-                t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
-                u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
+                t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den
+                u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den
                 if 1 > t > 0 and u > 0:
                     pt = Vector()
                     pt.x = x1 + t * (x2 - x1)
                     pt.y = y1 + t * (y2 - y1)
-                    return pt + other.position;
 
-g = 9.8
+                    dist = sqrt((pt.x - x3) ** 2 + (pt.y - y3) ** 2)
+                    if not last_pt:
+                        last_pt = pt
+                        last_dist = dist
+                    elif dist < last_dist:
+                        last_dist = dist
+                        last_pt = pt
+        return last_pt
 
 raycaster = Raycast()
 
@@ -231,6 +286,9 @@ def core_Engine_update(update):
 
     for entity in Screen.all_entities:
         entity.update()
+    
+    # pt = raycaster.ray(Vector(0, 1), Vector(0, -1))
+    # Screen.canvas.create_oval(pt.x * Vector.unit - 5 + Screen.width//2, -pt.y * Vector.unit - 5 + Screen.height//2, pt.x * Vector.unit + 5 + Screen.width//2, -pt.y * Vector.unit + 5 + Screen.height//2, fill = 'yellow')
     
     update()
 
