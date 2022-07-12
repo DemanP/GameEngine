@@ -124,7 +124,7 @@ class Vector:
             y = self.y + other.y
             return Vector(x, y)
     def __radd__(self, other):
-        self.__add__(other)
+        return self.__add__(other)
     def __repr__(self) -> tuple:
         return (self.x, self.y)
     def __mul__(self, other):
@@ -132,7 +132,7 @@ class Vector:
             x = self.x * other.x
             y = self.y * other.y
             return Vector(x, y)
-        if type(other) == int:
+        if type(other) in [int, float]:
             x = self.x * other
             y = self.y * other
             return Vector(x, y)
@@ -144,7 +144,7 @@ class Vector:
             y = self.y - other.y
             return Vector(x, y)
     def __rsub__(self, other):
-        self.__sub__(other)
+        return self.__sub__(other)
     def __str__(self):
         return str(self.x) + ', ' + str(self.y)
 class Entity:
