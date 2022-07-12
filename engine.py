@@ -48,6 +48,8 @@ class Scene:
     tk = Tk()
     canvas = Canvas(width = width, height = height, bg = BLACK, highlightthickness=0)
     canvas.pack()
+    def background(color):
+        Scene.canvas.configure(bg = color)
     def tick(time1, time2, FPS):
         sleep(time2-time1+1/FPS)
     def fullscreen(state:bool = True):
