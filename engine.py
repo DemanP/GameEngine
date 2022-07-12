@@ -1,7 +1,7 @@
 from tkinter import Tk, Canvas
 from time import sleep, time
 from keyboard import is_pressed
-import matrix
+import pgengine.matrix as matrix
 from math import hypot, radians, degrees, sqrt
 from copy import copy
 
@@ -109,6 +109,13 @@ class Vector:
         max_n = max(abs(self.x), abs(self.y))
         self.x, self.y = self.x / max_n, self.y / max_n
         return self
+    def normalised(self):
+        '''
+        This method normalising vector
+        '''
+        max_n = max(abs(self.x), abs(self.y))
+        return Vector(self.x / max_n, self.y / max_n)
+        
     def getMatrixPosition(self):
         '''
         :return: vector position in matrix style
@@ -156,6 +163,15 @@ class Entity:
         self.color = color
         self.last_rotation = 0
 
+        self.collider_shape = None
+        self.tag = tag
+
+        self.orientation = Vector(0, 1)
+        rotated = matrix.multiply(matrix.rotation(self.rotation - self.last_rotation), self.orientation.getMatrixPosition())
+        self.orientation.x, self.orientation.y = -rotated[0][0], -rotated[1][0]
+        self.last_rotation = self.rotation
+        self.forward = self.orientation.normalised()
+
         self.collider = Scene.defaultCollider
         self.collided = False
         self.colliding_objects = 'all'
@@ -171,11 +187,9 @@ class Entity:
 
         self.mass = mass
 
-        self.collider_shape = None
-        self.tag = tag
-
         Scene.all_entities.append(self)
     def update(self):
+        self.rotation = self.rotation
         if self.collider and self.colliding_objects == 'all':
             for _entity in Scene.all_entities:
                 if _entity != self and _entity.collider and self.collision(_entity):
@@ -231,7 +245,11 @@ class Entity:
             for v in self.verticies:
                 rotated = matrix.multiply(matrix.rotation(self.rotation - self.last_rotation), v.getMatrixPosition())
                 v.x, v.y = rotated[0][0], rotated[1][0]
-            self.last_rotation = self.rotation
+        rotated = matrix.multiply(matrix.rotation(self.rotation - self.last_rotation), self.orientation.getMatrixPosition())
+        self.orientation.x, self.orientation.y = rotated[0][0], rotated[1][0]
+        self.last_rotation = self.rotation
+
+        self.forward = self.orientation.normalised()
         
         self.draw()
     def gravity(self):
