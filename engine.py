@@ -1,4 +1,4 @@
-from tkinter import *
+from tkinter import Tk, Canvas
 from time import sleep, time
 from keyboard import is_pressed
 import matrix
@@ -7,6 +7,13 @@ from copy import copy
 
 BLACK = '#000'
 WHITE = '#fff'
+GRAY = '#888'
+RED = '#f00'
+GREEN = '#0f0'
+BLUE = '#00f'
+YELLOW = '#ff0'
+VIOLET = '#f0f'
+LIGHTBLUE = '#0ff'
 
 def add(a, b): return Vector(a.x + b.x, a.y + b.y)
 def sub(a, b): return Vector(a.x - b.x, a.y - b.y)
@@ -30,7 +37,7 @@ class Scene:
     '''
     all_entities = []
 
-    FPS = 30
+    FPS = 40
 
     g = 9.8
 
@@ -43,7 +50,7 @@ class Scene:
     canvas.pack()
     def tick(time1, time2, FPS):
         sleep(time2-time1+1/FPS)
-    def fullscreen(state = True):
+    def fullscreen(state:bool = True):
         '''
         Enter or exit fullscreen mode.
 
@@ -65,12 +72,11 @@ class Scene:
         Scene.tk.update_idletasks()
         Scene.tk.update()
         Scene.canvas.delete('all')
-    def setSize(width, height, defValue = True):
+    def setSize(width: int, height: int, defValue: bool = True):
         '''
         Seting a size of window to specified width and height
 
         :type width: int
-
         :type height: int
         '''
         if defValue:
@@ -79,11 +85,15 @@ class Scene:
         Scene.canvas.configure(width = width, height = height)
 
 class InputManager:
-    def __init__(self):
-        pass
     def keyDown(key):
+        '''
+        :return: is key pressed
+        '''
         return is_pressed(key)
     def mousePos():
+        '''
+        :return: mouse position
+        '''
         mouse_x = (Scene.tk.winfo_pointerx() - Scene.tk.winfo_rootx() - Scene.width//2) / Vector.unit
         mouse_y = (Scene.tk.winfo_pointery() - Scene.tk.winfo_rooty() - Scene.height//2) / Vector.unit
         return mouse_x, mouse_y
@@ -91,10 +101,16 @@ class InputManager:
 class Vector:
     unit = 50
     def normalise(self):
+        '''
+        This method normalising vector
+        '''
         max_n = max(abs(self.x), abs(self.y))
         self.x, self.y = self.x / max_n, self.y / max_n
         return self
     def getMatrixPosition(self):
+        '''
+        :return: vector position in matrix style
+        '''
         return (self.x, ), (self.y, )
     def __init__(self, x  = 0, y = 0, angle = 0):
         self.x = x
@@ -130,7 +146,7 @@ class Vector:
     def __str__(self):
         return str(self.x) + ', ' + str(self.y)
 class Entity:
-    def __init__(self, pos = copy(Vector(0, 0)), rot = 0, color = WHITE, tag = None, mass = 5):
+    def __init__(self, pos = copy(Vector(0, 0)), rot = 0, color: str = WHITE, tag = None, mass = 5):
         if type(pos) == tuple:
             pos = Vector(pos[0], pos[1])
         self.position = pos
@@ -232,22 +248,24 @@ class Entity:
         for i, v in enumerate(polygon.verticies):
             A = v
             B = copy(polygon.verticies[(i+1) % len(polygon.verticies)])
-            direction = (B - A).normalise()
-            direction.x, direction.y = direction.y, direction.x
-            direction.y *= -1
 
             linePt = None
-
-            x3 = circle.position.x
-            y3 = circle.position.y
-            x4 = circle.position.x + direction.x
-            y4 = circle.position.y + direction.y
         
-            x1 = A.x + polygon.position.x
-            y1 = A.y + polygon.position.y
-            x2 = B.x + polygon.position.x
-            y2 = B.y + polygon.position.y
+            x1 = (A.x + polygon.position.x)
+            y1 = (-A.y - polygon.position.y)
+            x2 = (B.x + polygon.position.x)
+            y2 = (-B.y - polygon.position.y)
 
+            x1D = copy(-A.x + polygon.position.x)
+            x2D = copy(-B.x + polygon.position.x)
+
+            direction = (B - A).normalise()
+            direction.x, direction.y = direction.y, direction.x
+
+            x3 = circle.position.x 
+            y3 = -circle.position.y
+            x4 = (circle.position.x + direction.x)
+            y4 = (-circle.position.y + direction.y)
 
             den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
             if (den == 0):
@@ -257,21 +275,17 @@ class Entity:
             u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den
             if 1 > t > 0 and 1 > u > 0:
                 linePt = Vector()
-                linePt.x = x1 + t * (x2 - x1)
-                linePt.y = y1 + t * (y2 - y1)
+                linePt.x = (x1 + t * (x2 - x1))
+                linePt.y = (y1 + t * (y2 - y1))
 
             if linePt == None:
-                distA = hypot(x1 - circle.position.x, y1 - circle.position.y)
-                distB = hypot(x2 - circle.position.x, y2 - circle.position.y)
-                # print(distA, distB)
+                distA = sqrt((x1D - circle.position.x) ** 2 + (y1 - circle.position.y) ** 2)
+                distB = sqrt((x2D - circle.position.x) ** 2 + (y2 - circle.position.y) ** 2)
                 if distA <= circle.radius or distB <= circle.radius:
                     return True
                 continue
-            # print('yes')
-            dist = hypot(linePt.x - circle.position.x, linePt.y - circle.position.y)
-            if dist <= circle.radius:
-                return True
-
+            
+            return True
     def collision(self, other):
         if self.collider_shape == 'rectangle':
             if other.collider_shape == 'rectangle':
@@ -310,7 +324,7 @@ class Entity:
             elif other.collider_shape == 'rectangle':
                 return Entity.circle_polygon_collision(self, other)
 class Rectangle(Entity):
-    def __init__(self, pos = None, rot = 0, scale = None, color = WHITE, tag = None, mass = 5):
+    def __init__(self, pos = None, rot = 0, scale = None, color: str = WHITE, tag = None, mass = 5):
         super().__init__(pos, rot, color, tag, mass)
         if not scale:
             scale = Vector(1, 1)
@@ -335,7 +349,7 @@ class Rectangle(Entity):
                 draw_verticies[i] += Scene.width//2
         Scene.canvas.create_polygon(draw_verticies, fill = self.color)
 class Circle(Entity):
-    def __init__(self, pos = None, rot = 0, radius = 10, color = WHITE, tag = None, mass = 5):
+    def __init__(self, pos = None, rot = 0, radius = 10, color: str = WHITE, tag = None, mass = 5):
         super().__init__(pos, rot, color, tag, mass)
         self.radius = radius
         self.collider_shape = 'circle'
@@ -343,7 +357,10 @@ class Circle(Entity):
         Scene.canvas.create_oval((self.position.x - self.radius) * Vector.unit + Scene.width//2, (self.position.y - self.radius)  * Vector.unit + Scene.height//2, (self.position.x + self.radius) * Vector.unit + Scene.width//2, (self.position.y + self.radius) * Vector.unit + Scene.height//2, fill = self.color, outline = '')
 
 class Raycast:
-    def ray(self, start_point, dir, objects = Scene.all_entities):
+    def ray(self, start_point: Vector, dir: Vector, objects = Scene.all_entities):
+        '''
+        :return: ray hit point
+        '''
         dir.normalise()
         x3 = start_point.x
         y3 = start_point.y

@@ -3,12 +3,12 @@ from engine import *
 def update():
     mouse_pos = InputManager.mousePos()
     circle.position = Vector(mouse_pos[0], mouse_pos[1])
-    circle.color = 'yellow'
-    if circle.collided: circle.color = '#0f0'
+    circle.color = YELLOW
+    if circle.collided: circle.color = GREEN
 
 Scene.defaultCollider = True
 
-circle = Circle((-1, 0), radius = 0.5, color = 'yellow')
-rect = Rectangle((6, 0), color = 'blue')
+circle = Circle((0, 0), radius = 1)
+rect = Rectangle((0, 0), rot = radians(10), scale = (3, 3), color = BLUE)
 
 Scene.run(update)
