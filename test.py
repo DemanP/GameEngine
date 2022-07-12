@@ -1,14 +1,14 @@
 from engine import *
 
 def update():
-    speed = Vector(0.25, 0)
-    if InputManager.keyDown('a'): player.position -= speed
-    if InputManager.keyDown('d'): player.position += speed
-    if InputManager.keyDown('space') and player.collided: player.force((0, 1))
+    mouse_pos = InputManager.mousePos()
+    circle.position = Vector(mouse_pos[0], mouse_pos[1])
+    circle.color = 'yellow'
+    if circle.collided: circle.color = '#0f0'
 
-platform = Rectangle(Vector(0, -5), radians(0), scale = Vector(5, 1), color = '#00f')
-player = Rectangle(Vector(0, 1), color = '#ff0', mass = 10)
-player.collider = True
-player.have_gravity = True
+Scene.defaultCollider = True
 
-Screen.run(update)
+circle = Circle((-1, 0), radius = 0.5, color = 'yellow')
+rect = Rectangle((6, 0), color = 'blue')
+
+Scene.run(update)
