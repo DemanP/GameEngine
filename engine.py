@@ -69,7 +69,7 @@ class Scene:
             Scene.setSize(Scene.def_width, Scene.def_height)
     def run(update = _empty):
         while 1:
-            core_Engine_update(update)
+            engine_update(update)
     def refresh():
         Scene.tk.update_idletasks()
         Scene.tk.update()
@@ -155,7 +155,7 @@ class Vector:
     def __str__(self):
         return str(self.x) + ', ' + str(self.y)
 class Entity:
-    def __init__(self, pos = copy(Vector(0, 0)), rot = 0, color: str = WHITE, tag = None, mass = 5):
+    def __init__(self, pos = None, rot = 0, color: str = WHITE, tag = None, mass = 5, drawable = True):
         if type(pos) == tuple:
             pos = Vector(pos[0], pos[1])
         self.position = pos
@@ -163,13 +163,15 @@ class Entity:
         self.color = color
         self.last_rotation = 0
 
+        self.drawable = drawable
+
         self.collider_shape = None
         self.tag = tag
 
-        self.orientation = Vector(0, 1)
-        rotated = matrix.multiply(matrix.rotation(self.rotation - self.last_rotation), self.orientation.getMatrixPosition())
-        self.orientation.x, self.orientation.y = -rotated[0][0], -rotated[1][0]
-        self.last_rotation = self.rotation
+        self.orientation = Vector(0, -1)
+        rotated = matrix.multiply(matrix.rotation(self.rotation), self.orientation.getMatrixPosition())
+        self.orientation.x, self.orientation.y = rotated[0][0], rotated[1][0]
+        # self.last_rotation = self.rotation
         self.forward = self.orientation.normalised()
 
         self.collider = Scene.defaultCollider
@@ -189,7 +191,7 @@ class Entity:
 
         Scene.all_entities.append(self)
     def update(self):
-        self.rotation = self.rotation
+        # self.last_rotation = self.rotation
         if self.collider and self.colliding_objects == 'all':
             for _entity in Scene.all_entities:
                 if _entity != self and _entity.collider and self.collision(_entity):
@@ -249,7 +251,7 @@ class Entity:
         self.orientation.x, self.orientation.y = rotated[0][0], rotated[1][0]
         self.last_rotation = self.rotation
 
-        self.forward = self.orientation.normalised()
+        self.forward = self.orientation
         
         self.draw()
     def gravity(self):
@@ -338,14 +340,14 @@ class Entity:
                 return Entity.circle_polygon_collision(other, self)
         if self.collider_shape == 'circle':
             if other.collider_shape == 'circle':
-                dist = hypot((other.position.x + other.radius) - (self.position.x + self.radius), (other.position.y + other.radius) - (self.position.y + self.radius))
+                dist = hypot(other.position.x - self.position.x, other.position.y - self.position.y)
                 if dist <= other.radius + self.radius:
                     return True
             elif other.collider_shape == 'rectangle':
                 return Entity.circle_polygon_collision(self, other)
 class Rectangle(Entity):
-    def __init__(self, pos = None, rot = 0, scale = None, color: str = WHITE, tag = None, mass = 5):
-        super().__init__(pos, rot, color, tag, mass)
+    def __init__(self, pos = copy(Vector(0, 0)), rot = 0, scale = None, color: str = WHITE, tag = None, mass = 5, drawable = True):
+        super().__init__(pos, rot, color, tag, mass, drawable)
         if not scale:
             scale = Vector(1, 1)
         elif type(scale) == tuple:
@@ -369,8 +371,8 @@ class Rectangle(Entity):
                 draw_verticies[i] += Scene.width//2
         Scene.canvas.create_polygon(draw_verticies, fill = self.color)
 class Circle(Entity):
-    def __init__(self, pos = None, rot = 0, radius = 10, color: str = WHITE, tag = None, mass = 5):
-        super().__init__(pos, rot, color, tag, mass)
+    def __init__(self, pos = copy(Vector(0, 0)), rot = 0, radius = 10, color: str = WHITE, tag = None, mass = 5, drawable = True):
+        super().__init__(pos, rot, color, tag, mass, drawable)
         self.radius = radius
         self.collider_shape = 'circle'
     def draw(self):
@@ -420,11 +422,12 @@ class Raycast:
 
 raycaster = Raycast()
 
-def core_Engine_update(update):
+def engine_update(update):
     time1 = time()
 
     for entity in Scene.all_entities:
-        entity.update()
+        if entity.drawable:
+            entity.update()
     
     # pt = raycaster.ray(Vector(0, 1), Vector(0, -1))
     # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
