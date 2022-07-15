@@ -168,11 +168,11 @@ class Entity:
         self.collider_shape = None
         self.tag = tag
 
-        self.orientation = Vector(0, -1)
+        self.orientation = Vector(1, 0)
         rotated = matrix.multiply(matrix.rotation(self.rotation), self.orientation.getMatrixPosition())
         self.orientation.x, self.orientation.y = rotated[0][0], rotated[1][0]
         # self.last_rotation = self.rotation
-        self.forward = self.orientation.normalised()
+        self.forward = self.orientation
 
         self.collider = Scene.defaultCollider
         self.collided = False
@@ -280,8 +280,10 @@ class Entity:
 
             x1D = copy(-A.x + polygon.position.x)
             x2D = copy(-B.x + polygon.position.x)
+            y1D = copy(-A.y + polygon.position.x)
+            y2D = copy(-B.y + polygon.position.x)
 
-            direction = (B - A).normalise()
+            direction = (B - A)
             direction.x, direction.y = direction.y, direction.x
 
             x3 = circle.position.x 
@@ -292,22 +294,40 @@ class Entity:
             den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
             if (den == 0):
                 continue
+            
+            pt = Vector(x4, y4)
+            Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
 
+            pt = Vector(x1, y1)
+            Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
             t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den
             u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den
             if 1 > t > 0 and 1 > u > 0:
                 linePt = Vector()
                 linePt.x = (x1 + t * (x2 - x1))
                 linePt.y = (y1 + t * (y2 - y1))
-
+            
             if linePt == None:
-                distA = sqrt((x1D - circle.position.x) ** 2 + (y1 - circle.position.y) ** 2)
-                distB = sqrt((x2D - circle.position.x) ** 2 + (y2 - circle.position.y) ** 2)
+                distA = sqrt((x1 - circle.position.x) ** 2 + (y1 + circle.position.y) ** 2)
+                distB = sqrt((x2 - circle.position.x) ** 2 + (y2 + circle.position.y) ** 2)
                 if distA <= circle.radius or distB <= circle.radius:
+                    # print(distA, distB)
+                    pt = Vector(x1, y1)
+                    Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'red')
+            
                     return True
                 continue
+
+            pt = copy(circle.position)
+            pt.y *= -1
+            Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
             
-            return True
+            pt = linePt
+            Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+            
+            if hypot(pt.x - circle.position.x, pt.y + circle.position.y) <= circle.radius:
+                print(pt, circle.position, hypot(pt.x - circle.position.x, pt.y - circle.position.y))
+                return True
     def collision(self, other):
         if self.collider_shape == 'rectangle':
             if other.collider_shape == 'rectangle':
@@ -361,7 +381,7 @@ class Rectangle(Entity):
         draw_verticies = [pos2 for pos in self.verticies for pos2 in pos.__repr__()]
         for i in range(len(draw_verticies)):
             if i % 2:
-                draw_verticies[i] -= self.position.y
+                draw_verticies[i] += self.position.y
             else:
                 draw_verticies[i] += self.position.x
             draw_verticies[i] *= Vector.unit
