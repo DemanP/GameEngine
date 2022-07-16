@@ -6,7 +6,7 @@ def update():
     circle.color = YELLOW
     if circle.collided: circle.color = GREEN
     if not rect.collided:
-        rect.rotation += radians(1)
+        rect.rotation -= radians(1)
 
 Scene.defaultCollider = True
 

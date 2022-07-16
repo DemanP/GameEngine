@@ -36,6 +36,7 @@ class Scene:
     -etc.
     '''
     all_entities = []
+    ui = []
 
     FPS = 40
 
@@ -169,10 +170,10 @@ class Entity:
         self.tag = tag
 
         self.orientation = Vector(1, 0)
-        rotated = matrix.multiply(matrix.rotation(self.rotation), self.orientation.getMatrixPosition())
-        self.orientation.x, self.orientation.y = rotated[0][0], rotated[1][0]
-        # self.last_rotation = self.rotation
         self.forward = self.orientation
+        # rotated = matrix.multiply(matrix.rotation(self.rotation), self.forward.getMatrixPosition())
+        # self.forward.x, self.forward.y = rotated[0][0], rotated[1][0]
+        # self.last_rotation = self.rotation
 
         self.collider = Scene.defaultCollider
         self.collided = False
@@ -278,11 +279,6 @@ class Entity:
             x2 = (B.x + polygon.position.x)
             y2 = (-B.y - polygon.position.y)
 
-            x1D = copy(-A.x + polygon.position.x)
-            x2D = copy(-B.x + polygon.position.x)
-            y1D = copy(-A.y + polygon.position.x)
-            y2D = copy(-B.y + polygon.position.x)
-
             direction = (B - A)
             direction.x, direction.y = direction.y, direction.x
 
@@ -295,11 +291,11 @@ class Entity:
             if (den == 0):
                 continue
             
-            pt = Vector(x4, y4)
-            Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+            # pt = Vector(x4, y4)
+            # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
 
-            pt = Vector(x1, y1)
-            Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+            # pt = Vector(x1, y1)
+            # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
             t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den
             u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den
             if 1 > t > 0 and 1 > u > 0:
@@ -311,22 +307,20 @@ class Entity:
                 distA = sqrt((x1 - circle.position.x) ** 2 + (y1 + circle.position.y) ** 2)
                 distB = sqrt((x2 - circle.position.x) ** 2 + (y2 + circle.position.y) ** 2)
                 if distA <= circle.radius or distB <= circle.radius:
-                    # print(distA, distB)
-                    pt = Vector(x1, y1)
-                    Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'red')
+                    # pt = Vector(x1, y1)
+                    # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'red')
             
                     return True
                 continue
 
-            pt = copy(circle.position)
-            pt.y *= -1
-            Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+            # pt = copy(circle.position)
+            # pt.y *= -1
+            # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
             
             pt = linePt
-            Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+            # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
             
             if hypot(pt.x - circle.position.x, pt.y + circle.position.y) <= circle.radius:
-                print(pt, circle.position, hypot(pt.x - circle.position.x, pt.y - circle.position.y))
                 return True
     def collision(self, other):
         if self.collider_shape == 'rectangle':
@@ -390,6 +384,7 @@ class Rectangle(Entity):
             else:
                 draw_verticies[i] += Scene.width//2
         Scene.canvas.create_polygon(draw_verticies, fill = self.color)
+        Scene.canvas.create_oval((self.position.x + self.orientation.x + 0.1) * Vector.unit + Scene.width//2, (self.position.y + self.orientation.y + 0.1)  * Vector.unit + Scene.height//2, (self.position.x + self.orientation.x - 0.1) * Vector.unit + Scene.width//2, (self.position.y + self.orientation.y - 0.1) * Vector.unit + Scene.height//2, fill = 'yellow')
 class Circle(Entity):
     def __init__(self, pos = copy(Vector(0, 0)), rot = 0, radius = 10, color: str = WHITE, tag = None, mass = 5, drawable = True):
         super().__init__(pos, rot, color, tag, mass, drawable)
@@ -397,6 +392,23 @@ class Circle(Entity):
         self.collider_shape = 'circle'
     def draw(self):
         Scene.canvas.create_oval((self.position.x - self.radius) * Vector.unit + Scene.width//2, (self.position.y - self.radius)  * Vector.unit + Scene.height//2, (self.position.x + self.radius) * Vector.unit + Scene.width//2, (self.position.y + self.radius) * Vector.unit + Scene.height//2, fill = self.color, outline = '')
+
+class Text:
+    def __init__(self, pos = copy(Vector(0, 0)), size = 1, text = '', color = 'black'):
+        if type(pos) == tuple:
+            pos = Vector(pos[0], pos[1])
+        self.position = pos
+        self.text = text
+        self.color = color
+        self.size = size
+
+        self.drawable = True
+
+        Scene.ui.append(self)
+    def update(self):
+        self.draw()
+    def draw(self):
+        Scene.canvas.create_text(self.position.x * Vector.unit + Scene.width/2, self.position.y * Vector.unit + Scene.height/2, text = self.text, fill = self.color, font = ('Times', int(self.size * Vector.unit)))
 
 class Raycast:
     def ray(self, start_point: Vector, dir: Vector, objects = Scene.all_entities):
@@ -448,6 +460,8 @@ def engine_update(update):
     for entity in Scene.all_entities:
         if entity.drawable:
             entity.update()
+    for ui_part in Scene.ui:
+        ui_part.update()
     
     # pt = raycaster.ray(Vector(0, 1), Vector(0, -1))
     # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
