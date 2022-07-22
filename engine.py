@@ -1,9 +1,11 @@
 from tkinter import Tk, Canvas
 from time import sleep, time
+from turtle import width
 from keyboard import is_pressed
 import pgengine.matrix as matrix
 from math import hypot, radians, degrees, sqrt
 from copy import copy
+import tkinter
 
 BLACK = '#000'
 WHITE = '#fff'
@@ -14,15 +16,6 @@ BLUE = '#00f'
 YELLOW = '#ff0'
 VIOLET = '#f0f'
 LIGHTBLUE = '#0ff'
-
-def add(a, b): return Vector(a.x + b.x, a.y + b.y)
-def sub(a, b): return Vector(a.x - b.x, a.y - b.y)
-def dot(a, b): return a.x * b.x + a.y * b.y
-def hypot2(a, b): return dot(sub(a, b), sub(a, b))
-
-def proj(a, b):
-    k = dot(a, b) / dot(b, b)
-    return Vector(k * b.x, k * b.y)
 
 def _empty():
     pass
@@ -88,6 +81,20 @@ class Scene:
         Scene.canvas.configure(width = width, height = height)
 
 class InputManager:
+    left_down = False
+    right_down = False
+    def initialisation():
+        Scene.canvas.bind("<Button-1>", InputManager.left_go_down)
+        Scene.canvas.bind("<ButtonRelease-1>", InputManager.left_go_up)
+    def left_go_down(evt):
+        InputManager.left_down = True
+    def left_go_up(evt):
+        InputManager.left_down = False
+    def getMouseButton(btn = 0):
+        if btn == 0:
+            return InputManager.left_down
+        elif btn == 1:
+            return InputManager.right_down
     def keyDown(key):
         '''
         :return: is key pressed
@@ -410,6 +417,36 @@ class Text:
     def draw(self):
         Scene.canvas.create_text(self.position.x * Vector.unit + Scene.width/2, self.position.y * Vector.unit + Scene.height/2, text = self.text, fill = self.color, font = ('Times', int(self.size * Vector.unit)))
 
+class Button:
+    def __init__(self, pos = copy(Vector(0, 0)), scale = copy(Vector(1, 1)), text = '', color = 'white', command = _empty):
+        if type(pos) == tuple:
+            pos = Vector(pos[0], pos[1])
+        elif type(scale) == tuple:
+            scale = Vector(scale[0], scale[1])
+        self.position = pos
+        self.text = text
+        self.color = color
+        self.scale = scale
+        self.command = command
+        self.clicked = False
+
+        self.drawable = True
+
+        Scene.ui.append(self)
+    def draw(self):
+        Scene.canvas.create_rectangle((self.position.x - self.scale.x/2) * Vector.unit + Scene.width/2, (self.position.y - self.scale.y/2) * Vector.unit + Scene.height/2, (self.position.x + self.scale.x/2) * Vector.unit + Scene.width/2, (self.position.y + self.scale.y/2) * Vector.unit + Scene.height/2, fill = self.color)
+        Scene.canvas.create_text(self.position.x * Vector.unit + Scene.width/2, self.position.y * Vector.unit + Scene.height/2, text = self.text, fill = 'black', font = ('Times', int(0.5 * Vector.unit)))
+    def update(self):
+        mouse_x, mouse_y = InputManager.mousePos()
+        if self.position.x - self.scale.x/2 < mouse_x < self.position.x + self.scale.x/2 and self.position.y - self.scale.y/2 < mouse_y < self.position.y + self.scale.y/2:
+            if InputManager.getMouseButton(0):
+                if not self.clicked:
+                    self.command()
+                self.clicked = True
+            else:
+                self.clicked = False
+        self.draw()
+
 class Raycast:
     def ray(self, start_point: Vector, dir: Vector, objects = Scene.all_entities):
         '''
@@ -453,6 +490,7 @@ class Raycast:
         return last_pt
 
 raycaster = Raycast()
+InputManager.initialisation()
 
 def engine_update(update):
     time1 = time()
@@ -462,7 +500,7 @@ def engine_update(update):
             entity.update()
     for ui_part in Scene.ui:
         ui_part.update()
-    
+        
     # pt = raycaster.ray(Vector(0, 1), Vector(0, -1))
     # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
     
