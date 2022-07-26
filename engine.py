@@ -32,6 +32,7 @@ class Scene:
     ui = []
 
     FPS = 40
+    unit = 50
 
     g = 9.8
 
@@ -104,12 +105,11 @@ class InputManager:
         '''
         :return: mouse position
         '''
-        mouse_x = (Scene.tk.winfo_pointerx() - Scene.tk.winfo_rootx() - Scene.width//2) / Vector.unit
-        mouse_y = (Scene.tk.winfo_pointery() - Scene.tk.winfo_rooty() - Scene.height//2) / Vector.unit
+        mouse_x = (Scene.tk.winfo_pointerx() - Scene.tk.winfo_rootx() - Scene.width//2) / Scene.unit
+        mouse_y = (Scene.tk.winfo_pointery() - Scene.tk.winfo_rooty() - Scene.height//2) / Scene.unit
         return mouse_x, mouse_y
 
 class Vector:
-    unit = 50
     def normalise(self):
         '''
         This method normalising vector
@@ -226,7 +226,7 @@ class Entity:
                 self.move_y = max(rays_y)
                 index = rays_y.index(self.move_y)
                 v = verticies_g[index]
-                self.move_y -= v.y + 1/Vector.unit
+                self.move_y -= v.y + 1/Scene.unit
         
         if self.collided and self.velY < 0:
             self.accY = 0
@@ -270,8 +270,8 @@ class Entity:
         if type(pos) == Vector:
             x, y = pos.getMatrixPosition()
         
-        fX = x / Vector.unit * 10
-        fY = y / Vector.unit * 10
+        fX = x / Scene.unit * 10
+        fY = y / Scene.unit * 10
         self.accX += fX
         self.accY += fY
     def circle_polygon_collision(circle, polygon):
@@ -299,10 +299,10 @@ class Entity:
                 continue
             
             # pt = Vector(x4, y4)
-            # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+            # Scene.canvas.create_oval(pt.x * Scene.unit - 5 + Scene.width//2, -pt.y * Scene.unit - 5 + Scene.height//2, pt.x * Scene.unit + 5 + Scene.width//2, -pt.y * Scene.unit + 5 + Scene.height//2, fill = 'yellow')
 
             # pt = Vector(x1, y1)
-            # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+            # Scene.canvas.create_oval(pt.x * Scene.unit - 5 + Scene.width//2, -pt.y * Scene.unit - 5 + Scene.height//2, pt.x * Scene.unit + 5 + Scene.width//2, -pt.y * Scene.unit + 5 + Scene.height//2, fill = 'yellow')
             t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den
             u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den
             if 1 > t > 0 and 1 > u > 0:
@@ -315,17 +315,17 @@ class Entity:
                 distB = sqrt((x2 - circle.position.x) ** 2 + (y2 + circle.position.y) ** 2)
                 if distA <= circle.radius or distB <= circle.radius:
                     # pt = Vector(x1, y1)
-                    # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'red')
+                    # Scene.canvas.create_oval(pt.x * Scene.unit - 5 + Scene.width//2, -pt.y * Scene.unit - 5 + Scene.height//2, pt.x * Scene.unit + 5 + Scene.width//2, -pt.y * Scene.unit + 5 + Scene.height//2, fill = 'red')
             
                     return True
                 continue
 
             # pt = copy(circle.position)
             # pt.y *= -1
-            # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+            # Scene.canvas.create_oval(pt.x * Scene.unit - 5 + Scene.width//2, -pt.y * Scene.unit - 5 + Scene.height//2, pt.x * Scene.unit + 5 + Scene.width//2, -pt.y * Scene.unit + 5 + Scene.height//2, fill = 'yellow')
             
             pt = linePt
-            # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+            # Scene.canvas.create_oval(pt.x * Scene.unit - 5 + Scene.width//2, -pt.y * Scene.unit - 5 + Scene.height//2, pt.x * Scene.unit + 5 + Scene.width//2, -pt.y * Scene.unit + 5 + Scene.height//2, fill = 'yellow')
             
             if hypot(pt.x - circle.position.x, pt.y + circle.position.y) <= circle.radius:
                 return True
@@ -354,7 +354,7 @@ class Entity:
                             pt = Vector()
                             pt.x = x1 + t * (x2 - x1)
                             pt.y = y1 + t * (y2 - y1)
-                            Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+                            Scene.canvas.create_oval(pt.x * Scene.unit - 5 + Scene.width//2, -pt.y * Scene.unit - 5 + Scene.height//2, pt.x * Scene.unit + 5 + Scene.width//2, -pt.y * Scene.unit + 5 + Scene.height//2, fill = 'yellow')
                             
                             return True
             elif other.collider_shape == 'circle':
@@ -385,20 +385,20 @@ class Rectangle(Entity):
                 draw_verticies[i] += self.position.y
             else:
                 draw_verticies[i] += self.position.x
-            draw_verticies[i] *= Vector.unit
+            draw_verticies[i] *= Scene.unit
             if i % 2:
                 draw_verticies[i] += Scene.height//2
             else:
                 draw_verticies[i] += Scene.width//2
         Scene.canvas.create_polygon(draw_verticies, fill = self.color)
-        Scene.canvas.create_oval((self.position.x + self.orientation.x + 0.1) * Vector.unit + Scene.width//2, (self.position.y + self.orientation.y + 0.1)  * Vector.unit + Scene.height//2, (self.position.x + self.orientation.x - 0.1) * Vector.unit + Scene.width//2, (self.position.y + self.orientation.y - 0.1) * Vector.unit + Scene.height//2, fill = 'yellow')
+        Scene.canvas.create_oval((self.position.x + self.orientation.x + 0.1) * Scene.unit + Scene.width//2, (self.position.y + self.orientation.y + 0.1)  * Scene.unit + Scene.height//2, (self.position.x + self.orientation.x - 0.1) * Scene.unit + Scene.width//2, (self.position.y + self.orientation.y - 0.1) * Scene.unit + Scene.height//2, fill = 'yellow')
 class Circle(Entity):
     def __init__(self, pos = copy(Vector(0, 0)), rot = 0, radius = 10, color: str = WHITE, tag = None, mass = 5, drawable = True):
         super().__init__(pos, rot, color, tag, mass, drawable)
         self.radius = radius
         self.collider_shape = 'circle'
     def draw(self):
-        Scene.canvas.create_oval((self.position.x - self.radius) * Vector.unit + Scene.width//2, (self.position.y - self.radius)  * Vector.unit + Scene.height//2, (self.position.x + self.radius) * Vector.unit + Scene.width//2, (self.position.y + self.radius) * Vector.unit + Scene.height//2, fill = self.color, outline = '')
+        Scene.canvas.create_oval((self.position.x - self.radius) * Scene.unit + Scene.width//2, (self.position.y - self.radius)  * Scene.unit + Scene.height//2, (self.position.x + self.radius) * Scene.unit + Scene.width//2, (self.position.y + self.radius) * Scene.unit + Scene.height//2, fill = self.color, outline = '')
 
 class Text:
     def __init__(self, pos = copy(Vector(0, 0)), size = 1, text = '', color = 'black'):
@@ -415,7 +415,7 @@ class Text:
     def update(self):
         self.draw()
     def draw(self):
-        Scene.canvas.create_text(self.position.x * Vector.unit + Scene.width/2, self.position.y * Vector.unit + Scene.height/2, text = self.text, fill = self.color, font = ('Times', int(self.size * Vector.unit)))
+        Scene.canvas.create_text(self.position.x * Scene.unit + Scene.width/2, self.position.y * Scene.unit + Scene.height/2, text = self.text, fill = self.color, font = ('Times', int(self.size * Scene.unit)))
 
 class Button:
     def __init__(self, pos = copy(Vector(0, 0)), scale = copy(Vector(1, 1)), text = '', color = 'white', command = _empty):
@@ -434,8 +434,8 @@ class Button:
 
         Scene.ui.append(self)
     def draw(self):
-        Scene.canvas.create_rectangle((self.position.x - self.scale.x/2) * Vector.unit + Scene.width/2, (self.position.y - self.scale.y/2) * Vector.unit + Scene.height/2, (self.position.x + self.scale.x/2) * Vector.unit + Scene.width/2, (self.position.y + self.scale.y/2) * Vector.unit + Scene.height/2, fill = self.color)
-        Scene.canvas.create_text(self.position.x * Vector.unit + Scene.width/2, self.position.y * Vector.unit + Scene.height/2, text = self.text, fill = 'black', font = ('Times', int(0.5 * Vector.unit)))
+        Scene.canvas.create_rectangle((self.position.x - self.scale.x/2) * Scene.unit + Scene.width/2, (self.position.y - self.scale.y/2) * Scene.unit + Scene.height/2, (self.position.x + self.scale.x/2) * Scene.unit + Scene.width/2, (self.position.y + self.scale.y/2) * Scene.unit + Scene.height/2, fill = self.color)
+        Scene.canvas.create_text(self.position.x * Scene.unit + Scene.width/2, self.position.y * Scene.unit + Scene.height/2, text = self.text, fill = 'black', font = ('Times', int(0.5 * Scene.unit)))
     def update(self):
         mouse_x, mouse_y = InputManager.mousePos()
         if self.position.x - self.scale.x/2 < mouse_x < self.position.x + self.scale.x/2 and self.position.y - self.scale.y/2 < mouse_y < self.position.y + self.scale.y/2:
@@ -502,7 +502,7 @@ def engine_update(update):
         ui_part.update()
         
     # pt = raycaster.ray(Vector(0, 1), Vector(0, -1))
-    # Scene.canvas.create_oval(pt.x * Vector.unit - 5 + Scene.width//2, -pt.y * Vector.unit - 5 + Scene.height//2, pt.x * Vector.unit + 5 + Scene.width//2, -pt.y * Vector.unit + 5 + Scene.height//2, fill = 'yellow')
+    # Scene.canvas.create_oval(pt.x * Scene.unit - 5 + Scene.width//2, -pt.y * Scene.unit - 5 + Scene.height//2, pt.x * Scene.unit + 5 + Scene.width//2, -pt.y * Scene.unit + 5 + Scene.height//2, fill = 'yellow')
     
     update()
 
