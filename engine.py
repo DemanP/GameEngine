@@ -1,6 +1,5 @@
 from tkinter import Tk, Canvas
 from time import sleep, time
-from turtle import width
 from keyboard import is_pressed
 import pgengine.matrix as matrix
 from math import hypot, radians, degrees, sqrt
