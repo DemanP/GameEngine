@@ -127,39 +127,39 @@ class scene:
 
         for entity in self.all_entities:
             if entity.usable:
-                if entity.drawable and type(entity) == Image:
-                    if int(entity.scale.x * self.unit) and int(entity.scale.y * self.unit):
-                        if entity.last_scale == None:
-                            entity.drawing_image = Image_.open(entity.image)
+                # if entity.drawable and type(entity) == Image:
+                #     if int(entity.scale.x * self.unit) and int(entity.scale.y * self.unit):
+                #         if entity.last_scale == None:
+                #             entity.drawing_image = Image_.open(entity.image)
                             
                         
-                            if int(entity.scale.x * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_LEFT_RIGHT)
-                            if int(entity.scale.y * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_TOP_BOTTOM)
+                #             if int(entity.scale.x * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_LEFT_RIGHT)
+                #             if int(entity.scale.y * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_TOP_BOTTOM)
                             
-                            # if entity.scale != entity.last_scale:
-                            #     entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
-                            # if entity.rotation != entity.last_rotation:
-                            #     entity.drawing_image = entity.drawing_image.rotate(degrees(entity.rotation), expand=True)
+                #             # if entity.scale != entity.last_scale:
+                #             #     entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
+                #             # if entity.rotation != entity.last_rotation:
+                #             #     entity.drawing_image = entity.drawing_image.rotate(degrees(entity.rotation), expand=True)
                                 
-                            entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
-                            entity.drawing_image = entity.drawing_image.rotate(-degrees(entity.rotation), expand=True)
-                            entity.drawing_image = ImageTk.PhotoImage(entity.drawing_image)
+                #             entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
+                #             entity.drawing_image = entity.drawing_image.rotate(-degrees(entity.rotation), expand=True)
+                #             entity.drawing_image = ImageTk.PhotoImage(entity.drawing_image)
                             
-                            entity.id = self.canvas.create_image(entity.position.x * self.unit + self.width//2, entity.position.y * self.unit + self.height//2, image = entity.drawing_image)
-                        elif not (entity.last_rotation == entity.rotation and entity.last_scale == entity.scale and entity.image == entity.last_image):
-                            entity.drawing_image = Image_.open(entity.image)
+                #             entity.id = self.canvas.create_image(entity.position.x * self.unit + self.width//2, entity.position.y * self.unit + self.height//2, image = entity.drawing_image)
+                #         elif not (entity.last_rotation == entity.rotation and entity.last_scale == entity.scale and entity.image == entity.last_image):
+                #             entity.drawing_image = Image_.open(entity.image)
                         
-                            if int(entity.scale.x * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_LEFT_RIGHT)
-                            if int(entity.scale.y * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_TOP_BOTTOM)
+                #             if int(entity.scale.x * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_LEFT_RIGHT)
+                #             if int(entity.scale.y * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_TOP_BOTTOM)
                                 
-                            entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
-                            entity.drawing_image = entity.drawing_image.rotate(-degrees(entity.rotation), expand=True)
-                            entity.drawing_image = ImageTk.PhotoImage(entity.drawing_image)
+                #             entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
+                #             entity.drawing_image = entity.drawing_image.rotate(-degrees(entity.rotation), expand=True)
+                #             entity.drawing_image = ImageTk.PhotoImage(entity.drawing_image)
                             
-                            self.canvas.itemconfig(entity.id, image=entity.drawing_image)
-                        entity.last_scale = entity.scale
-                        entity.last_image = entity.image
-                        # self.canvas.create_image(entity.position.x * self.unit + self.width//2, entity.position.y * self.unit + self.height//2, image = entity.drawing_image)
+                #             self.canvas.itemconfig(entity.id, image=entity.drawing_image)
+                #         entity.last_scale = entity.scale
+                #         entity.last_image = entity.image
+                #         # self.canvas.create_image(entity.position.x * self.unit + self.width//2, entity.position.y * self.unit + self.height//2, image = entity.drawing_image)
                 entity.update()
         for ui_part in self.ui:
             ui_part.update()
@@ -170,6 +170,7 @@ class scene:
         update()
 
         time2 = time()
+        Time.delta = time2 - time1
         # self.tick(time1, time2, self.FPS)
         
         try:
@@ -294,10 +295,11 @@ class Random:
     def seed(seed):
         return random.seed(seed)
 class Time:
-    start_time = time()
+    start = time()
+    delta = 0.005
     def running():
         """returns time passed since start of program"""
-        return time() - Time.start_time
+        return time() - Time.start
     def time():
         """returns current hour, minute and second"""
         return localtime()[3:6]
@@ -447,6 +449,8 @@ class Entity:
         
         if on_scene:
             Scene.all_entities.append(self)
+    def look_at(self, target):
+        self.rotation = (target - self.position).angle()
     def destroy(self):
         Scene.all_entities.pop(Scene.all_entities.index(self))
     def update(self):
@@ -465,8 +469,8 @@ class Entity:
         self.velX += self.accX
         self.velY += self.accY
 
-        self.position.x += self.velX
-        self.position.y += self.velY
+        self.position.x += self.velX * Time.delta
+        self.position.y += self.velY * Time.delta
 
         self.accX = 0
         self.accY = 0
@@ -516,8 +520,8 @@ class Entity:
         if type(pos) == Vector:
             x, y = pos.x, pos.y
         
-        fX = x / Scene.unit
-        fY = y / Scene.unit
+        fX = x / Scene.unit * 100 * Scene.main_camera.FOV
+        fY = y / Scene.unit * 100 * Scene.main_camera.FOV
         self.accX += fX
         self.accY += fY
     def circle_line_collision(circle, line):
@@ -722,7 +726,7 @@ class Circle(Entity):
         self.color = color
         self.collider_shape = 'circle'
     def draw(self):
-        mult = Scene.unit * Scene.main_camera.FOV
+        mult = Scene.unit / Scene.main_camera.FOV
         camera_ = Scene.main_camera
         x1, y1 = (self.position.x - self.radius + camera_.position.x) * mult + Scene.width//2, (self.position.y - self.radius + camera_.position.y) * mult + Scene.height//2
         x2, y2 = (self.position.x + self.radius + camera_.position.x) * mult + Scene.width//2, (self.position.y + self.radius + camera_.position.y) * mult + Scene.height//2
@@ -740,7 +744,7 @@ class Line(Entity):
         self.width = width
         self.collider_shape = 'line'
     def draw(self):
-        mult = Scene.unit * Scene.main_camera.FOV
+        mult = Scene.unit / Scene.main_camera.FOV
         camera_ = Scene.main_camera
         x1, y1 = (self.start.x + camera_.position.x) * mult + Scene.width//2, (self.start.y + camera_.position.y) * mult + Scene.height//2
         x2, y2 = (self.end.x + camera_.position.x) * mult + Scene.width//2, (self.end.y + camera_.position.y) * mult + Scene.height//2
@@ -757,8 +761,42 @@ class Image(Entity):
         self.scale = scale
         self.last_scale = None
         self.last_image = None
-        # self.draw()
-    def draw(self): pass # self.id = Scene.canvas.create_image(self.position.x * Scene.unit + Scene.width//2, self.position.y * Scene.unit + Scene.height//2)
+        self.draw()
+    def draw(self):
+        mult = Scene.unit / Scene.main_camera.FOV
+        if int(self.scale.x * mult) and int(self.scale.y * mult):
+            if self.last_scale == None:
+                self.drawing_image = Image_.open(self.image)
+            
+                if int(self.scale.x * mult) < 0: self.drawing_image = self.drawing_image.transpose(Image_.FLIP_LEFT_RIGHT)
+                if int(self.scale.y * mult) < 0: self.drawing_image = self.drawing_image.transpose(Image_.FLIP_TOP_BOTTOM)
+                
+                # if self.scale != self.last_scale:
+                #     self.drawing_image = self.drawing_image.resize((abs(int(self.scale.x * Scene.unit)), abs(int(self.scale.y * Scene.unit))), 0)
+                # if self.rotation != self.last_rotation:
+                #     self.drawing_image = self.drawing_image.rotate(degrees(self.rotation), expand=True)
+                    
+                self.drawing_image = self.drawing_image.resize((abs(int(self.scale.x * mult)), abs(int(self.scale.y * mult))), 0)
+                self.drawing_image = self.drawing_image.rotate(-degrees(self.rotation), expand=True)
+                self.drawing_image = ImageTk.PhotoImage(self.drawing_image)
+                
+                self.id = Scene.canvas.create_image((self.position.x - Scene.main_camera.position.x) * mult + Scene.width//2, (self.position.y - Scene.main_camera.position.y) * mult + Scene.height//2, image = self.drawing_image)
+            elif not (self.last_rotation == self.rotation and self.last_scale == self.scale and self.image == self.last_image and self.last_position == self.position):
+                self.drawing_image = Image_.open(self.image)
+            
+                if int(self.scale.x * mult) < 0: self.drawing_image = self.drawing_image.transpose(Image_.FLIP_LEFT_RIGHT)
+                if int(self.scale.y * mult) < 0: self.drawing_image = self.drawing_image.transpose(Image_.FLIP_TOP_BOTTOM)
+                    
+                self.drawing_image = self.drawing_image.resize((abs(int(self.scale.x * mult)), abs(int(self.scale.y * mult))), 0)
+                self.drawing_image = self.drawing_image.rotate(-degrees(self.rotation), expand=True)
+                self.drawing_image = ImageTk.PhotoImage(self.drawing_image)
+                if self.last_position != self.position:
+                    Scene.canvas.moveto(self.id, self.position.x, self.position.y)
+                
+                Scene.canvas.itemconfig(self.id, image=self.drawing_image)
+            self.last_scale = self.scale
+            self.last_position = self.position
+            self.last_image = self.image
 class Text(Entity):
     def __init__(self, pos = copy(Vector(0, 0)), size = 1, rot = 0, text = '', color = Color.BLACK, parent = None, tag = None, mass = 5, drawable = True, usable = True, on_scene = True, entity_update = _empty, entity_class = None):
         if type(pos) == tuple:
@@ -774,7 +812,7 @@ class Text(Entity):
     # def update(self):
     #     self.draw()
     def draw(self):
-        mult = Scene.unit * Scene.main_camera.FOV
+        mult = Scene.unit / Scene.main_camera.FOV
         camera_ = Scene.main_camera
         x, y = (self.position.x + camera_.position.x) * mult + Scene.width//2, (self.position.y + camera_.position.y) * mult + Scene.height//2
         self.ids.append(Scene.canvas.create_text(x, y, text = self.text, fill = self.color, font = ('Comic Sans MS', int(self.size * Scene.unit))))
@@ -803,7 +841,7 @@ class Button(Entity):
         if self.clicked and self.position.x - self.scale.x/2 < mouse_x < self.position.x + self.scale.x/2 and self.position.y - self.scale.y/2 < mouse_y < self.position.y + self.scale.y/2:
             color = self.highlight_color
         
-        mult = Scene.unit * Scene.main_camera.FOV
+        mult = Scene.unit / Scene.main_camera.FOV
         camera_ = Scene.main_camera
         
         x1, y1 = (self.position.x - self.scale.x/2 + camera_.position.x) * mult + Scene.width//2, (self.position.y - self.scale.y/2 + camera_.position.y) * mult + Scene.height//2
@@ -849,7 +887,7 @@ class InputField(Entity):
         # if self.clicked and self.position.x - self.scale.x/2 < mouse_x < self.position.x + self.scale.x/2 and self.position.y - self.scale.y/2 < mouse_y < self.position.y + self.scale.y/2:
         #     color = self.highlight_color
         
-        mult = Scene.unit * Scene.main_camera.FOV
+        mult = Scene.unit / Scene.main_camera.FOV
         camera_ = Scene.main_camera
         
         x1, y1 = (self.position.x - self.scale.x/2 + camera_.position.x) * mult + Scene.width//2, (self.position.y - self.scale.y/2 + camera_.position.y) * mult + Scene.height//2
