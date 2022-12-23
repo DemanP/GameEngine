@@ -7,7 +7,6 @@ import keyboard
 import matrix
 from math import hypot, radians, degrees, sqrt, atan2, sin, cos
 from copy import copy
-# import tkinter
 
 
 
@@ -143,7 +142,7 @@ class scene:
                             #     entity.drawing_image = entity.drawing_image.rotate(degrees(entity.rotation), expand=True)
                                 
                             entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
-                            entity.drawing_image = entity.drawing_image.rotate(degrees(entity.rotation), expand=True)
+                            entity.drawing_image = entity.drawing_image.rotate(-degrees(entity.rotation), expand=True)
                             entity.drawing_image = ImageTk.PhotoImage(entity.drawing_image)
                             
                             entity.id = self.canvas.create_image(entity.position.x * self.unit + self.width//2, entity.position.y * self.unit + self.height//2, image = entity.drawing_image)
@@ -154,7 +153,7 @@ class scene:
                             if int(entity.scale.y * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_TOP_BOTTOM)
                                 
                             entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
-                            entity.drawing_image = entity.drawing_image.rotate(degrees(entity.rotation), expand=True)
+                            entity.drawing_image = entity.drawing_image.rotate(-degrees(entity.rotation), expand=True)
                             entity.drawing_image = ImageTk.PhotoImage(entity.drawing_image)
                             
                             self.canvas.itemconfig(entity.id, image=entity.drawing_image)
@@ -331,10 +330,11 @@ class Vector:
     def set(self, x, y):
         self.x = x
         self.y = y
-    def __init__(self, x  = 0, y = 0, angle = 0):
+    def angle(self):
+        return atan2(self.y, self.x)
+    def __init__(self, x  = 0, y = 0):
         self.x = x
         self.y = y
-        self.angle = angle
     def __add__(self, other):
         if type(other) == Vector:
             x = self.x + other.x
@@ -799,7 +799,7 @@ class Button(Entity):
         self.clicked = False
     def draw(self):
         color = self.color
-        mouse_x, mouse_y = InputManager.mousePos()
+        mouse_x, mouse_y = InputManager.mousePos(False)
         if self.clicked and self.position.x - self.scale.x/2 < mouse_x < self.position.x + self.scale.x/2 and self.position.y - self.scale.y/2 < mouse_y < self.position.y + self.scale.y/2:
             color = self.highlight_color
         
@@ -812,7 +812,7 @@ class Button(Entity):
         x, y = (self.position.x + camera_.position.x) * mult + Scene.width//2, (self.position.y + camera_.position.y) * mult + Scene.height//2
         self.ids.append(Scene.canvas.create_text(x, y, text = self.text, fill = self.text_color, font = ('Times', int(0.35 * Scene.unit))))
     def class_update(self):
-        mouse_x, mouse_y = InputManager.mousePos()
+        mouse_x, mouse_y = InputManager.mousePos(False)
         if InputManager.getMouseButton(0):
             if self.clicked:
                 self.whileclicked(self)
@@ -880,7 +880,7 @@ class InputField(Entity):
                 self.text = self.text[:self.cursor] + key.name + self.text[self.cursor:]
                 self.cursor+=1
     def class_update(self):
-        mouse_x, mouse_y = InputManager.mousePos()
+        mouse_x, mouse_y = InputManager.mousePos(False)
         if InputManager.getMouseButton(0):
             if self.position.x - self.scale.x/2 < mouse_x < self.position.x + self.scale.x/2 and self.position.y - self.scale.y/2 < mouse_y < self.position.y + self.scale.y/2:
                 self.selected = True
@@ -923,7 +923,7 @@ class ParticleSystem(Entity):
         max_num = self.max_spawn_num
         color = self.particle_color
         for i in range(Random.int(min_num, max_num)):
-            angle = Random.percent(self.spawn_angle) - self.spawn_angle/2 + self.rotation
+            angle = Random.percent(self.spawn_angle) - self.spawn_angle/2 - self.rotation
             dist = Random.percent(spawn_range)
             pos = self.position + Vector(dist * sin(angle), dist * cos(angle))
             circle = Circle(pos=pos, radius=size, color=color)
