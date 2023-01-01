@@ -1,5 +1,8 @@
 __pycache__/
+PGEngine/
 hhh.py
 image_test.py
 game_test.py
-PGEngine/
+shader_test.py
+spring_test.py
+rope_test.py

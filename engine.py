@@ -7,6 +7,9 @@ import keyboard
 import matrix
 from math import hypot, radians, degrees, sqrt, atan2, sin, cos
 from copy import copy
+import taichi as ti
+import taichi_glsl as ts
+import numpy as np
 
 
 
@@ -31,6 +34,14 @@ def hex2dec(num):
     for i, s in enumerate(num):
         returned += Color.hex_table[s] * 16 ** (len(num)-i-1)
     return returned
+
+class Error:
+    def __init__(self, error_type, message):
+        print(error_type + ": " + message)
+        exit()
+class ArgumentError(Error):
+    def __init__(self, func_name, arg_name, needed_type):
+        super().__init__("ArgumentError", f"{func_name} needs {needed_type} as {arg_name} argument")
 
 class Color:
     BLACK = '#000'
@@ -74,8 +85,6 @@ class Color:
         if type(color) == Color:
             color = color.color
         r, g, b = color
-        # mod = r%16
-        # while q:
         red = dec2hex(r, 2)
         green = dec2hex(g, 2)
         blue = dec2hex(b, 2)
@@ -83,14 +92,92 @@ class Color:
     def hex2rgb(color):
         if type(color) == Color:
             color = color.color
+        elif type(color) != str:
+            ArgumentError("hex2rgb", "color", "str")
         color = color[1:]
         r, g, b = color[:2], color[2:4], color[4:]
-        # red = Color.hex_table[r[:1]]*16 + Color.hex_table[r[1:]]
-        # green = Color.hex_table[g[:1]]*16 + Color.hex_table[g[1:]]
-        # blue = Color.hex_table[b[:1]]*16 + Color.hex_table[b[1:]]
         red, green, blue = hex2dec(r), hex2dec(g), hex2dec(b)
         return [red, green, blue]
 
+class Program:
+    print("-- Program started --")
+    running = True
+    tk = Tk()
+    tk.title('Window')   
+    width, height = 1000, 800
+    
+    unit = 50
+    FPS = 150
+    
+    cur_scene = None
+    
+    def_width, def_height = width, height
+    
+    tk.geometry(f"{width}x{height}")
+    def run(update = _empty):
+        while Program.running:
+            if Time.running() > 0.01:
+                # Program.program_update()
+                Program.cur_scene.canvas.configure(width=Program.tk.winfo_width(), height=Program.tk.winfo_height())
+                Program.width, Program.height = Program.cur_scene.canvas.winfo_width(), Program.cur_scene.canvas.winfo_height()
+            Program.cur_scene.update_scene(update)
+    # def program_update():
+    #     Program.FPS = Time.delta
+    def set_scene(scene):
+        Program.cur_scene.canvas.pack_forget()
+        Program.cur_scene = scene
+        Program.cur_scene.canvas.pack(padx = 0, pady = 0)
+    def update_window():
+        Program.tk.update_idletasks()
+        Program.tk.update()
+    def title(name):
+        Program.tk.title(name)
+    def resizable(state=True):
+        Program.tk.resizable(state, state)
+    def cursor(name):
+        Program.tk.configure(cursor=name)
+    def fullscreen(state: bool = True):
+        '''
+        Enter or exit fullscreen mode.
+
+        :param state: Enter or exit fullscreen variable.
+        :type state: bool
+        '''
+        if state:
+            Program.tk.attributes('-fullscreen', True)
+            screen_width, screen_height = Program.getScreenSize()
+            Program.setSize(screen_width, screen_height, defValue = False)
+        else:
+            Program.tk.attributes('-fullscreen', False)
+            Program.setSize(Program.def_width, Program.def_height)
+    def setSize(width: int, height: int, units = False, defValue: bool = True):
+        '''
+        Seting a size of window to specified width and height
+
+        :type width: int
+        :type height: int
+        '''
+        if defValue:
+            Program.def_width, Program.def_height = width, height
+        if units:
+            width /= Program.unit
+            height /= Program.unit
+        Program.width, Program.height = width, height
+        Program.cur_scene.canvas.configure(width = width, height = height)
+        Program.tk.geometry(f"{width}x{height}")
+    def getScreenSize(units=False, vector=False):
+        if units:
+            return Program.tk.winfo_screenwidth()/Program.unit, Program.tk.winfo_screenheight()/Program.unit
+        elif vector:
+            return Vector(Program.tk.winfo_screenwidth()/Program.unit, Program.tk.winfo_screenheight()/Program.unit)
+        return Program.tk.winfo_screenwidth(), Program.tk.winfo_screenheight()
+    def getWindowSize(units=False, vector=False):
+        width, height = Program.width, Program.height
+        if units:
+            width, height = Program.width/Program.unit, Program.height/Program.unit
+        if vector:
+            return Vector(width, height)
+        return width, height
 class scene:
     '''
     This is scene class. It contains all information about:
@@ -99,198 +186,120 @@ class scene:
     -FPS
     -etc.
     '''
-    def __init__(self):
-        self.running = True
-        
+    def __init__(self, camera=True):
         self.all_entities = []
         self.ui = []
-
-        self.FPS = 500
-        self.unit = 50
         
         self.main_camera = None
         
         self.g = 9.8
         self.defaultCollider = False
-        self.width, self.height = 1000, 800
-        
-        self.def_width, self.def_height = self.width, self.height
-        
-        self.tk = Tk()
-        self.tk.title('Window')
-        self.tk.geometry(f"{self.width}x{self.height}")
-        
-        self.canvas = Canvas(width = self.width, height = self.height, bg = Color.BLACK, highlightthickness=0)
-        self.canvas.pack()
-    def engine_update(self, update):
+                
+        self.canvas = Canvas(width = Program.width, height = Program.height, bg = Color.BLACK, highlightthickness=0)
+    def update_scene(self, update):
         time1 = time()
+        
+        self.mult = Program.unit / self.main_camera.FOV
+        
+        for key in Input.key_listeners:
+            Input.key_listeners[key] = is_pressed(key)
 
         for entity in self.all_entities:
             if entity.usable:
-                # if entity.drawable and type(entity) == Image:
-                #     if int(entity.scale.x * self.unit) and int(entity.scale.y * self.unit):
-                #         if entity.last_scale == None:
-                #             entity.drawing_image = Image_.open(entity.image)
-                            
-                        
-                #             if int(entity.scale.x * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_LEFT_RIGHT)
-                #             if int(entity.scale.y * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_TOP_BOTTOM)
-                            
-                #             # if entity.scale != entity.last_scale:
-                #             #     entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
-                #             # if entity.rotation != entity.last_rotation:
-                #             #     entity.drawing_image = entity.drawing_image.rotate(degrees(entity.rotation), expand=True)
-                                
-                #             entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
-                #             entity.drawing_image = entity.drawing_image.rotate(-degrees(entity.rotation), expand=True)
-                #             entity.drawing_image = ImageTk.PhotoImage(entity.drawing_image)
-                            
-                #             entity.id = self.canvas.create_image(entity.position.x * self.unit + self.width//2, entity.position.y * self.unit + self.height//2, image = entity.drawing_image)
-                #         elif not (entity.last_rotation == entity.rotation and entity.last_scale == entity.scale and entity.image == entity.last_image):
-                #             entity.drawing_image = Image_.open(entity.image)
-                        
-                #             if int(entity.scale.x * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_LEFT_RIGHT)
-                #             if int(entity.scale.y * self.unit) < 0: entity.drawing_image = entity.drawing_image.transpose(Image_.FLIP_TOP_BOTTOM)
-                                
-                #             entity.drawing_image = entity.drawing_image.resize((abs(int(entity.scale.x * self.unit)), abs(int(entity.scale.y * self.unit))), 0)
-                #             entity.drawing_image = entity.drawing_image.rotate(-degrees(entity.rotation), expand=True)
-                #             entity.drawing_image = ImageTk.PhotoImage(entity.drawing_image)
-                            
-                #             self.canvas.itemconfig(entity.id, image=entity.drawing_image)
-                #         entity.last_scale = entity.scale
-                #         entity.last_image = entity.image
-                #         # self.canvas.create_image(entity.position.x * self.unit + self.width//2, entity.position.y * self.unit + self.height//2, image = entity.drawing_image)
                 entity.update()
         for entity in self.ui:
             if entity.usable:
                 entity.update()
         
-        width, height = self.getWindowSize(True)
+        width, height = Program.getWindowSize(True)
         window_bounds.verticies = [Vector(x, y) for x in [-width/2, width/2] for y in [-height/2, height/2]]
         window_bounds.verticies[2], window_bounds.verticies[3] = window_bounds.verticies[3], window_bounds.verticies[2]
         
         # Calling given update function
         update()
-        
-        time2 = time()
-        self.tick(time1, time2, self.FPS)
-        
-        time3 = time()
-        delta = time3 - time1
-        if delta:
-            Time.delta = delta * 100
-        
-        # self.FPS = 100/Time.delta
-        
+                
         try:
-            self.update_window()
+            Program.update_window()
             self.refresh()
         except:
-            self.running = False
+            Program.running = False
+        
+        time2 = time()
+        delta = time2 - time1
+        Time.delta = delta * 100
+        if delta:
+            Program.FPS = 1 / delta
+        else:
+            Program.FPS = "Infinity"
     def background(self, color):
         self.canvas.configure(bg = color)
-    def title(self, name):
-        self.tk.title(name)
     def tick(self, time1, time2, FPS):
         sleep(time2-time1+1/FPS)
-    def cursor(self, name):
-        self.tk.configure(cursor=name)
-    def fullscreen(self, state:bool = True):
-        '''
-        Enter or exit fullscreen mode.
-
-        :param state: Enter or exit fullscreen variable.
-        :type state: bool
-        '''
-        if state:
-            self.tk.attributes('-fullscreen', True)
-            screen_width, screen_height = self.getScreenSize()
-            self.setSize(screen_width, screen_height, defValue = False)
-        else:
-            self.tk.attributes('-fullscreen', False)
-            self.setSize(self.def_width, self.def_height)
-    def resizable(self, state=True):
-        self.tk.resizable(state, state)
-    def run(self, update = _empty):
-        while self.running:
-            if Time.running() > 0.01:
-                self.canvas.configure(width=self.tk.winfo_width(), height=self.tk.winfo_height())
-                self.width, self.height = self.canvas.winfo_width(), self.canvas.winfo_height()
-            self.engine_update(update)
+    # def run(self, update = _empty):
+    #     while self.running:
+    #         if Time.running() > 0.01:
+    #             self.canvas.configure(width=self.tk.winfo_width(), height=self.tk.winfo_height())
+    #             self.width, self.height = self.canvas.winfo_width(), self.canvas.winfo_height()
+    #         self.update_scene(update)
+    #     print("-- Program ended --")
     def refresh(self):
-        for entity in self.all_entities:
-            if entity.drawable and type(entity) != Image:
-                for id in entity.ids:
-                    self.canvas.delete(id)
-        for entity in self.ui:
-            if entity.drawable and type(entity) != Image:
-                for id in entity.ids:
-                    self.canvas.delete(id)
-        # self.canvas.delete('all')
-    def update_window(self):
-        self.tk.update_idletasks()
-        self.tk.update()
-    def setSize(self, width: int, height: int, units = False, defValue: bool = True):
-        '''
-        Seting a size of window to specified width and height
+        # for entity in self.all_entities:
+        #     if entity.drawable and type(entity) != Image:
+        #         for id in entity.ids:
+        #             self.canvas.delete(id)
+        # for entity in self.ui:
+        #     if entity.drawable and type(entity) != Image:
+        #         for id in entity.ids:
+        #             self.canvas.delete(id)
+        self.canvas.delete('all')
+Scene = scene(False)
+Scene.canvas.pack()
+Program.cur_scene = Scene
 
-        :type width: int
-        :type height: int
-        '''
-        if defValue:
-            self.def_width, self.def_height = width, height
-        if units:
-            width /= self.unit
-            height /= self.unit
-        self.width, self.height = width, height
-        self.canvas.configure(width = width, height = height)
-        self.tk.geometry(f"{width}x{height}")
-    def getScreenSize(self, units=False, vector=False):
-        if units:
-            return self.tk.winfo_screenwidth()/self.unit, self.tk.winfo_screenheight()/self.unit
-        elif vector:
-            return Vector(self.tk.winfo_screenwidth()/self.unit, self.tk.winfo_screenheight()/self.unit)
-        return self.tk.winfo_screenwidth(), self.tk.winfo_screenheight()
-    def getWindowSize(self, units=False, vector=False):
-        if units:
-            return self.width/self.unit, self.height/self.unit
-        elif vector:
-            return Vector(self.width/self.unit, self.height/self.unit)
-        return self.width, self.height
-Scene = scene()
-
-class InputManager:
+class Input:
     left_down = False
     right_down = False
+    key_listeners = {}
     def initialisate():
-        Scene.canvas.bind("<Button-1>", InputManager.left_go_down)
-        Scene.canvas.bind("<ButtonRelease-1>", InputManager.left_go_up)
-        Scene.canvas.bind("<Button-3>", InputManager.right_go_down)
-        Scene.canvas.bind("<ButtonRelease-3>", InputManager.right_go_up)
+        Program.cur_scene.canvas.bind("<Button-1>", Input.left_go_down)
+        Program.cur_scene.canvas.bind("<ButtonRelease-1>", Input.left_go_up)
+        Program.cur_scene.canvas.bind("<Button-3>", Input.right_go_down)
+        Program.cur_scene.canvas.bind("<ButtonRelease-3>", Input.right_go_up)
     def left_go_down(evt):
-        InputManager.left_down = True
+        Input.left_down = True
     def left_go_up(evt):
-        InputManager.left_down = False
+        Input.left_down = False
     def right_go_down(evt):
-        InputManager.right_down = True
+        Input.right_down = True
     def right_go_up(evt):
-        InputManager.right_down = False
-    def getMouseButton(btn = 0):
+        Input.right_down = False
+    def mouse_button(btn = 0):
         if btn == 0:
-            return InputManager.left_down
+            return Input.left_down
         elif btn == 1:
-            return InputManager.right_down
-    def keyDown(key):
-        '''
-        :return: is key pressed
-        '''
-        return is_pressed(key)
-    def mousePos(vector = True):
+            return Input.right_down
+    def get_key(key):
+        if key in Input.key_listeners:
+            return Input.key_listeners[key]
+        else:
+            Error("KeyNotFound", f'key "{key}" has no listener')
+    def put_key_listener(key):
+        if type(key) in [tuple, list]:
+            for key_ in key:
+                Input.key_listeners[key_] = False
+        elif type(key) == str:
+            Input.key_listeners[key] = False
+        else:
+            ArgumentError("put_key_listener", "key", "tuple, list or str")
+    def mouse_pos(unit = True, vector = True):
         '''
         :return: mouse position
         '''
-        mouse_x = (Scene.tk.winfo_pointerx() - Scene.tk.winfo_rootx() - Scene.width//2) / Scene.unit
-        mouse_y = (Scene.tk.winfo_pointery() - Scene.tk.winfo_rooty() - Scene.height//2) / Scene.unit
+        mouse_x = (min(max(Program.tk.winfo_pointerx() - Program.tk.winfo_rootx(), 0), Program.width) - Program.width//2)
+        mouse_y = (min(max(Program.tk.winfo_pointery() - Program.tk.winfo_rooty(), 0), Program.height) - Program.height//2)
+        if unit:
+            mouse_x /= Program.unit
+            mouse_y /= Program.unit
         if not vector:
             return mouse_x, mouse_y
         return Vector(mouse_x, mouse_y)
@@ -312,6 +321,7 @@ class Random:
 class Time:
     start = time()
     delta = 0.005
+    from_start = 0
     def running():
         """returns time passed since start of program"""
         return time() - Time.start
@@ -325,7 +335,7 @@ class Vector:
         self.y = y
     def normalise(self):
         '''
-        This method normalising vector
+        This method normalises vector
         '''
         max_n = max(abs(self.x), abs(self.y))
         if max_n != 0:
@@ -333,12 +343,14 @@ class Vector:
         return self
     def normalised(self):
         '''
-        This method normalising vector
+        This method returns normalised copy of vector
         '''
         max_n = max(abs(self.x), abs(self.y))
         if max_n != 0:
             return Vector(self.x / max_n, self.y / max_n)
         return self
+    def tuple(self):
+        return self.x, self.y
     def getMatrixPosition(self):
         '''
         :return: vector position in matrix style
@@ -352,6 +364,8 @@ class Vector:
         self.y = y
     def angle(self):
         return atan2(self.y, self.x) + radians(90)
+    def int(self):
+        return Vector(int(self.x), int(self.y))
     def __add__(self, other):
         if type(other) == Vector:
             x = self.x + other.x
@@ -417,7 +431,7 @@ class Vector:
     def __str__(self):
         return "Vector(" + str(self.x) + ', ' + str(self.y) + ")"
 class Entity:
-    def __init__(self, pos = copy(Vector(0, 0)), rot = 0, tag = None, mass = 5, drawable = True, usable = True, on_scene=True, entity_update = _empty, entity_class = None, static = False, ui = False):
+    def __init__(self, pos = copy(Vector(0, 0)), rot = 0, tag = None, mass = 5, drawable = True, usable = True, on_scene=True, entity_update = _empty, entity_class = None, static = False, ui = False, parent=None):
         if type(pos) == tuple:
             pos = Vector(pos[0], pos[1])
         self.position = pos
@@ -439,13 +453,8 @@ class Entity:
         self.left = Vector(-1, 0)
         self.right = Vector(1, 0)
         self.back = Vector(0, -1)
-        # Scene.width//2 = anchorX
-        # Scene.height//2 = anchorY
-        # rotated = matrix.multiply(matrix.rotation(self.rotation), self.forward.getMatrixPosition())
-        # self.forward.x, self.forward.y = rotated[0][0], rotated[1][0]
-        # self.last_rotation = self.rotation
 
-        self.collider = Scene.defaultCollider
+        self.collider = Program.cur_scene.defaultCollider
         self.rigidbody = False
         self.collided = False
         self.colliding_objects = 'all'
@@ -461,21 +470,26 @@ class Entity:
 
         self.mass = mass
         
+        self.parent = parent
+        self.global_position = self.position
+        if parent:
+            self.global_position += parent.position
+        
         self.ids = []
         
         if ui: on_scene = False
         self.on_scene = on_scene
         self.ui = ui
         if on_scene:
-            Scene.all_entities.append(self)
+            Program.cur_scene.all_entities.append(self)
         elif ui:
-            Scene.ui.append(self)
+            Program.cur_scene.ui.append(self)
     def look_at(self, target, extra_angle = 0):
         self.rotation = (target - self.position).angle() + extra_angle
     def destroy(self):
-        Scene.all_entities.pop(Scene.all_entities.index(self))
+        Program.cur_scene.all_entities.pop(Program.cur_scene.all_entities.index(self))
         for id in self.ids:
-            Scene.canvas.delete(id)
+            Program.cur_scene.canvas.delete(id)
     def create_rect_collider(self, scale):
         self.collider_shape = 'polygon'
         self.collider_verticies = [Vector(x, y) for x in [-scale.x/2, scale.x/2] for y in [-scale.y/2, scale.y/2]]
@@ -485,7 +499,7 @@ class Entity:
         if not self.static:
             try:
                 if self.collider and self.colliding_objects == 'all':
-                    for _entity in Scene.all_entities:
+                    for _entity in Program.cur_scene.all_entities:
                         if _entity != self and _entity.collider and self.collision(_entity):
                             self.collided = True
                             break
@@ -506,7 +520,7 @@ class Entity:
             
             try:
                 if self.collider and self.colliding_objects == 'all':
-                    for _entity in Scene.all_entities:
+                    for _entity in Program.cur_scene.all_entities:
                         if _entity != self and _entity.collider and self.collision(_entity):
                             self.collided = True
                             break
@@ -531,30 +545,32 @@ class Entity:
             self.right.set(-self.left.x, -self.left.y)
             
             self.class_update()
-            
             self.entity_update(self)
+        
+        if self.parent: self.global_position = self.position + self.parent.position
+        else: self.global_position = self.position
         
         if self.drawable:
             in_view = False
-            window_size = Scene.getWindowSize(True)
+            window_size = Program.getWindowSize(True)
             window_bounds_copy = copy(window_bounds)
-            window_bounds_copy.position += Scene.main_camera.position
+            window_bounds_copy.position += Program.cur_scene.main_camera.position
             # if type(self) == Polygon: 
-                # print(-window_size[0]/2 < self.position.x - Scene.main_camera.position.x < window_size[0]/2, -window_size[1]/2 < self.position.y - Scene.main_camera.position.y < window_size[1]/2, self.collision(window_bounds))
-            if self.ui or type(self) == Image or ((-window_size[0]/2 < self.position.x - Scene.main_camera.position.x < window_size[0]/2 and -window_size[1]/2 < self.position.y - Scene.main_camera.position.y < window_size[1]/2) or self.collision(window_bounds_copy)):
+                # print(-window_size[0]/2 < self.position.x - Program.cur_scene.main_camera.position.x < window_size[0]/2, -window_size[1]/2 < self.position.y - Program.cur_scene.main_camera.position.y < window_size[1]/2, self.collision(window_bounds))
+            if self.ui or ((-window_size[0]/2 < self.position.x - Program.cur_scene.main_camera.position.x < window_size[0]/2 and -window_size[1]/2 < self.position.y - Program.cur_scene.main_camera.position.y < window_size[1]/2) or self.collision(window_bounds_copy)):
                         in_view = True
             if in_view: self.ids = []; self.draw()
     def gravity(self):
         if not self.collided:
-            self.force((0, self.mass / 1000 * Scene.g))
+            self.force((0, self.mass / 1000 * Program.cur_scene.g))
     def force(self, pos):
         if type(pos) == tuple:
             x, y = pos
         if type(pos) == Vector:
             x, y = pos.x, pos.y
         
-        fX = x / Scene.unit * Scene.main_camera.FOV
-        fY = y / Scene.unit * Scene.main_camera.FOV
+        fX = x / Program.unit * Program.cur_scene.main_camera.FOV
+        fY = y / Program.unit * Program.cur_scene.main_camera.FOV
         self.accX += fX
         self.accY += fY
     def circle_line_collision(circle, line):
@@ -657,16 +673,16 @@ class Entity:
         elif self.collider_shape == 'polygon':
             if other.collider_shape == 'polygon':
                 for i, v1 in enumerate(other.collider_verticies):
-                    x1 = (-v1.x + other.position.x)
-                    y1 = v1.y + other.position.y
-                    x2 = (-other.collider_verticies[(i+1) % 4].x + other.position.x)
-                    y2 = other.collider_verticies[(i+1) % 4].y + other.position.y
+                    x1 = (-v1.x + other.global_position.x)
+                    y1 = v1.y + other.global_position.y
+                    x2 = (-other.collider_verticies[(i+1) % 4].x + other.global_position.x)
+                    y2 = other.collider_verticies[(i+1) % 4].y + other.global_position.y
 
                     for j, v2 in enumerate(self.collider_verticies):
-                        x3 = -v2.x + self.position.x
-                        y3 = v2.y + self.position.y
-                        x4 = -self.collider_verticies[(j+1) % 4].x + self.position.x
-                        y4 = self.collider_verticies[(j+1) % 4].y + self.position.y
+                        x3 = -v2.x + self.global_position.x
+                        y3 = v2.y + self.global_position.y
+                        x4 = -self.collider_verticies[(j+1) % 4].x + self.global_position.x
+                        y4 = self.collider_verticies[(j+1) % 4].y + self.global_position.y
 
                         den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
                         if (den == 0):
@@ -685,9 +701,9 @@ class Entity:
                                 vert = copy(v2)
                                 vert.y *= -1
                                 # vert.x *= -1
-                                vert += self.position
+                                vert += self.global_position
                                 pt = vert
-                                # Scene.canvas.create_oval(pt.x * Scene.unit - 5 + Scene.width//2, pt.y * Scene.unit - 5 + Scene.height//2, pt.x * Scene.unit + 5 + Scene.width//2, pt.y * Scene.unit + 5 + Scene.height//2, fill = 'yellow')
+                                # Program.cur_scene.canvas.create_oval(pt.x * Program.unit - 5 + Program.width//2, pt.y * Program.unit - 5 + Program.height//2, pt.x * Program.unit + 5 + Program.width//2, pt.y * Program.unit + 5 + Program.height//2, fill = 'yellow')
                                 
                                 hit = raycaster.ray(vert, normal, [other])
                                 if sign(self.velX) == -sign(normal.x):
@@ -697,14 +713,14 @@ class Entity:
                                 
                                 if hit:
                                     # hit.x *= -1
-                                    self.position += hit - vert
+                                    self.global_position += hit - vert
                                 # print(hit, vert)
                                 # if normal.x and normal.y:
-                                #     self.position += Vector(1 / Scene.unit * abs(normal.x) / normal.x, 1 / Scene.unit * abs(normal.y) / normal.y)
+                                #     self.position += Vector(1 / Program.unit * abs(normal.x) / normal.x, 1 / Program.unit * abs(normal.y) / normal.y)
                                 # elif not normal.x:
-                                #     self.position += Vector(1 / Scene.unit * normal.x, 1 / Scene.unit * abs(normal.y) / normal.y)
+                                #     self.position += Vector(1 / Program.unit * normal.x, 1 / Program.unit * abs(normal.y) / normal.y)
                                 # elif not normal.y:
-                                #     self.position += Vector(1 / Scene.unit * abs(normal.x) / normal.x, 1 / Scene.unit * normal.y)
+                                #     self.position += Vector(1 / Program.unit * abs(normal.x) / normal.x, 1 / Program.unit * normal.y)
                             return True
             elif other.collider_shape == 'circle':
                 return Entity.circle_polygon_collision(other, self)
@@ -712,7 +728,7 @@ class Entity:
             if other.collider_shape == 'line':
                 return self.circle_line_collision((other.start, other.end))
             elif other.collider_shape == 'circle':
-                dist = Vector.distance(self.position, other.position)
+                dist = Vector.distance(self.global_position, other.global_position)
                 if dist <= other.radius + self.radius:
                     return True
             elif other.collider_shape == 'polygon':
@@ -727,7 +743,7 @@ class Camera(Entity):
         self.min_FOV = abs(self.min_FOV)
         self.FOV = max(self.min_FOV, self.FOV)
 camera = Camera()
-Scene.main_camera = camera
+Program.cur_scene.main_camera = camera
 
 class Polygon(Entity):
     def __init__(self, pos = copy(Vector(0, 0)), rot = 0, scale = None, color: str = Color.WHITE, outline_color = '', outline_width = 1, tag = None, mass = 5, drawable = True, usable = True, on_scene = True, entity_update = _empty, entity_class = None, static = False):
@@ -740,28 +756,29 @@ class Polygon(Entity):
         self.color = color
         self.outline_color = outline_color
         self.outline_width = outline_width
-        self.collider_shape = 'polygon'
-
+        
         self.verticies = [Vector(x, y) for x in [-scale.x/2, scale.x/2] for y in [-scale.y/2, scale.y/2]]
         self.verticies[2], self.verticies[3] = self.verticies[3], self.verticies[2]
+        
+        self.collider_shape = 'polygon'
         self.collider_verticies = self.verticies
     def draw(self):
-        camera_ = Scene.main_camera
+        camera_ = Program.cur_scene.main_camera
         draw_verticies = [pos2 for pos in self.verticies for pos2 in pos.__repr__()]
         camera_offset = Vector()
         if self.on_scene:
             camera_offset = camera_.position
         for i in range(len(draw_verticies)):
             if i % 2:
-                draw_verticies[i] += self.position.y - camera_offset.y
+                draw_verticies[i] += self.global_position.y - camera_offset.y
             else:
-                draw_verticies[i] += self.position.x - camera_offset.x
-            draw_verticies[i] *= Scene.unit / camera_.FOV
+                draw_verticies[i] += self.global_position.x - camera_offset.x
+            draw_verticies[i] *= Program.cur_scene.mult
             if i % 2:
-                draw_verticies[i] += Scene.height//2
+                draw_verticies[i] += Program.height//2
             else:
-                draw_verticies[i] += Scene.width//2
-        self.ids.append(Scene.canvas.create_polygon(draw_verticies, fill = self.color, outline=self.outline_color, width=self.outline_width))
+                draw_verticies[i] += Program.width//2
+        self.ids.append(Program.cur_scene.canvas.create_polygon(draw_verticies, fill = self.color, outline=self.outline_color, width=self.outline_width))
 class Circle(Entity):
     def __init__(self, pos = copy(Vector(0, 0)), rot = 0, radius = 0.5, color: str = Color.WHITE, tag = None, mass = 5, drawable = True, usable=True, on_scene=True, entity_update = _empty, entity_class = None, static = False):
         super().__init__(pos, rot, tag, mass, drawable, usable, on_scene, entity_update, entity_class, static)
@@ -769,14 +786,14 @@ class Circle(Entity):
         self.color = color
         self.collider_shape = 'circle'
     def draw(self):
-        mult = Scene.unit / Scene.main_camera.FOV
-        camera_ = Scene.main_camera
+        mult = Program.unit / Program.cur_scene.main_camera.FOV
+        camera_ = Program.cur_scene.main_camera
         camera_offset = Vector()
         if self.on_scene:
             camera_offset = camera_.position
-        x1, y1 = (self.position.x - self.radius - camera_offset.x) * mult + Scene.width//2, (self.position.y - self.radius - camera_offset.y) * mult + Scene.height//2
-        x2, y2 = (self.position.x + self.radius - camera_offset.x) * mult + Scene.width//2, (self.position.y + self.radius - camera_offset.y) * mult + Scene.height//2
-        self.ids.append(Scene.canvas.create_oval(x1, y1, x2, y2, fill = self.color, outline = ''))
+        x1, y1 = (self.global_position.x - self.radius - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.global_position.y - self.radius - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        x2, y2 = (self.global_position.x + self.radius - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.global_position.y + self.radius - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        self.ids.append(Program.cur_scene.canvas.create_oval(x1, y1, x2, y2, fill = self.color, outline = ''))
 class Line(Entity):
     def __init__(self, start = copy(Vector(0, 0)), end=copy(Vector(0, 0)), rot=0, color: str = Color.WHITE, tag=None, mass=5, drawable=True, usable=True, on_scene=True, entity_update = _empty, entity_class = None, static = False, width = 3):
         if type(start) == tuple:
@@ -790,75 +807,59 @@ class Line(Entity):
         self.width = width
         self.collider_shape = 'line'
     def draw(self):
-        mult = Scene.unit / Scene.main_camera.FOV
-        camera_ = Scene.main_camera
+        mult = Program.unit / Program.cur_scene.main_camera.FOV
+        camera_ = Program.cur_scene.main_camera
         camera_offset = Vector()
         if self.on_scene:
             camera_offset = camera_.position
-        x1, y1 = (self.start.x - camera_offset.x) * mult + Scene.width//2, (self.start.y - camera_offset.y) * mult + Scene.height//2
-        x2, y2 = (self.end.x - camera_offset.x) * mult + Scene.width//2, (self.end.y - camera_offset.y) * mult + Scene.height//2
-        self.ids.append(Scene.canvas.create_line(x1, y1, x2, y2, width = self.width, fill = self.color))
+        x1, y1 = (self.start.x - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.start.y - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        x2, y2 = (self.end.x - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.end.y - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        self.ids.append(Program.cur_scene.canvas.create_line(x1, y1, x2, y2, width = self.width, fill = self.color))
+
+class Texture:
+    def __init__(self, path):
+        self.path = path
+        self.read()
+    def read(self):
+        self.image = Image_.open(self.path)
 
 class Image(Entity):
-    def __init__(self, pos=copy(Vector(0, 0)), scale = None, rot=0, image="", tag=None, mass=5, drawable=True, usable=True, on_scene=True, entity_update = _empty, entity_class = None, static = False):
-        # if type(pos) == tuple:
-        #     pos = Vector(pos[0], pos[1])
+    def __init__(self, pos: Vector = copy(Vector(0, 0)), scale: Vector = None, rot=0, texture: Texture = "", tag=None, mass=5, drawable=True, usable=True, on_scene=True, entity_update = _empty, entity_class = None, static = False, ui = False, parent = None):
         if not scale: scale = Vector(1, 1)
         elif type(scale) == tuple:
             scale = Vector(scale[0], scale[1])
-        super().__init__(pos, rot, tag, mass, drawable, usable, on_scene, entity_update, entity_class, static)
-        self.image = image
+        super().__init__(pos, rot, tag, mass, drawable, usable, on_scene, entity_update, entity_class, static, ui, parent)
+        self.texture = texture
         self.scale = scale
-        self.last_scale = None
-        self.last_image = None
-        self.read()
-        self.draw()
-    def read(self):
-        self.read_image = Image_.open(self.image)
+        self.last_scale = Vector()
+        
+        self.collider_shape = 'polygon'
+        self.collider_verticies = [Vector(x, y) for x in [-scale.x/2, scale.x/2] for y in [-scale.y/2, scale.y/2]]
+        self.collider_verticies[2], self.collider_verticies[3] = self.collider_verticies[3], self.collider_verticies[2]
+        
+        self.load_texture()
+    def load_texture(self):
+        self.image = self.texture.image
     def draw(self):
-        mult = Scene.unit / Scene.main_camera.FOV
-        if int(self.scale.x * mult) and int(self.scale.y * mult):
-            if self.last_scale == None:
-                drawing_image = self.read_image
-                if int(self.scale.x * mult) < 0: drawing_image = drawing_image.transpose(Image_.FLIP_LEFT_RIGHT)
-                if int(self.scale.y * mult) < 0: drawing_image = drawing_image.transpose(Image_.FLIP_TOP_BOTTOM)
-                
-                # if self.scale != self.last_scale:
-                #     self.drawing_image = self.drawing_image.resize((abs(int(self.scale.x * Scene.unit)), abs(int(self.scale.y * Scene.unit))), 0)
-                # if self.rotation != self.last_rotation:
-                #     self.drawing_image = self.drawing_image.rotate(degrees(self.rotation), expand=True)
-                    
-                drawing_image = drawing_image.resize((abs(int(self.scale.x * mult)), abs(int(self.scale.y * mult))), 0)
-                drawing_image = drawing_image.rotate(-degrees(self.rotation), expand=True)
-                self.drawing_image = ImageTk.PhotoImage(drawing_image)
-                
-                camera_ = Scene.main_camera
-                camera_offset = Vector()
-                if self.on_scene:
-                    camera_offset = camera_.position
-                
-                self.ids = [Scene.canvas.create_image((self.position.x - camera_offset.x) * mult + Scene.width//2, (self.position.y - camera_offset.y) * mult + Scene.height//2, image = self.drawing_image)]
-            # elif not (self.last_rotation == self.rotation and self.last_scale == self.scale and self.image == self.last_image): # and self.last_position.__repr__() == self.position.__repr__()
-            else:            
-                if int(self.scale.x * mult) < 0: self.drawing_image = self.read_image.transpose(Image_.FLIP_LEFT_RIGHT)
-                if int(self.scale.y * mult) < 0: self.drawing_image = self.read_image.transpose(Image_.FLIP_TOP_BOTTOM)
-                    
-                self.drawing_image = self.drawing_image.resize((abs(int(self.scale.x * mult)), abs(int(self.scale.y * mult))), 0)
-                self.drawing_image = self.drawing_image.rotate(-degrees(self.rotation), expand=True)
-                self.drawing_image = ImageTk.PhotoImage(self.drawing_image)
-                
-                Scene.canvas.itemconfig(self.id, image=self.drawing_image)
-                # if self.last_position.__repr__() != self.position.__repr__():
-                camera_ = Scene.main_camera
-                camera_offset = Vector()
-                if self.on_scene:
-                    camera_offset = camera_.position
-                # print((self.position.x - camera_offset.x) * mult + Scene.width//2, (self.position.y - camera_offset.y) * mult + Scene.height//2,\
-                # (self.last_position.x - camera_offset.x) * mult + Scene.width//2, (self.last_position.y - camera_offset.y) * mult + Scene.height//2)
-                Scene.canvas.moveto(self.ids[0], (self.position.x - camera_offset.x) * mult + Scene.width//2, (self.position.y - camera_offset.y) * mult + Scene.height//2)
-            # self.last_scale = self.scale
-            # # self.last_position = self.position
-            # self.last_image = self.image
+        if self.scale.x * Program.cur_scene.mult and self.scale.y * Program.cur_scene.mult:
+            if int(self.scale.x * Program.cur_scene.mult) < 0: self.image = self.image.transpose(Image_.FLIP_LEFT_RIGHT)
+            if int(self.scale.y * Program.cur_scene.mult) < 0: self.image = self.image.transpose(Image_.FLIP_TOP_BOTTOM)
+            
+            if self.last_scale.tuple() != self.scale.tuple() or self.last_rotation != self.rotation:
+                self.image = self.texture.image
+                self.image = self.image.resize((abs(int(self.scale.x * Program.cur_scene.mult)), abs(int(self.scale.y * Program.cur_scene.mult))), 0)
+                self.image = self.image.rotate(-degrees(self.rotation), expand=True)
+            self.drawing_image = ImageTk.PhotoImage(self.image)
+            
+            camera_ = Program.cur_scene.main_camera
+            camera_offset = Vector()
+            if self.on_scene:
+                camera_offset = camera_.position
+            
+            # print("aboba")
+            self.ids = [Program.cur_scene.canvas.create_image((self.global_position.x - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.global_position.y - camera_offset.y) * Program.cur_scene.mult + Program.height//2, image = self.drawing_image)]
+            
+            self.last_scale = self.scale
 class Text(Entity):
     def __init__(self, pos = copy(Vector(0, 0)), size = 1, rot = 0, text = '', color = Color.BLACK, parent = None, tag = None, mass = 5, drawable = True, usable = True, on_scene = True, entity_update = _empty, entity_class = None, static = False, ui=False):
         if type(pos) == tuple:
@@ -871,13 +872,13 @@ class Text(Entity):
         self.parent = parent
         
     def draw(self):
-        mult = Scene.unit / Scene.main_camera.FOV
-        camera_ = Scene.main_camera
+        mult = Program.unit / Program.cur_scene.main_camera.FOV
+        camera_ = Program.cur_scene.main_camera
         camera_offset = Vector()
-        if self.on_scene and not self in Scene.ui:
+        if self.on_scene and not self in Program.cur_scene.ui:
             camera_offset = camera_.position
-        x, y = (self.position.x - camera_offset.x) * mult + Scene.width//2, (self.position.y - camera_offset.y) * mult + Scene.height//2
-        self.ids.append(Scene.canvas.create_text(x, y, text = self.text, fill = self.color, font = ('Comic Sans MS', int(self.size * Scene.unit/10))))
+        x, y = (self.global_position.x - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.global_position.y - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        self.ids.append(Program.cur_scene.canvas.create_text(x, y, text = self.text, fill = self.color, font = ('Comic Sans MS', int(self.size * Program.unit/10))))
 class Button(Entity):
     def __init__(self, pos = copy(Vector(0, 0)), scale = copy(Vector(1, 1)), rot = 0, text = '', text_color = Color.BLACK, color = Color.WHITE, outline_color = '', outline_width = 1, highlight_color = 'white', onclick = _empty, onrelease = _empty, whileclicked = _empty, tag = None, mass = 5, drawable = True, usable = True, on_scene = True, entity_update = _empty, entity_class = None, static = False, ui=False):
         if type(pos) == tuple:
@@ -885,7 +886,6 @@ class Button(Entity):
         if type(scale) == tuple:
             scale = Vector(scale[0], scale[1])
         super().__init__(pos, rot, tag, mass, drawable, usable, on_scene, entity_update, entity_class, static, ui)
-        # self.position = pos
         self.text = text
         self.color = color
         self.outline_color = outline_color
@@ -899,25 +899,24 @@ class Button(Entity):
         self.clicked = False
     def draw(self):
         color = self.color
-        mouse_x, mouse_y = InputManager.mousePos(False)
+        mouse_x, mouse_y = Input.mouse_pos(False)
         if self.clicked and self.position.x - self.scale.x/2 < mouse_x < self.position.x + self.scale.x/2 and self.position.y - self.scale.y/2 < mouse_y < self.position.y + self.scale.y/2:
             color = self.highlight_color
         
-        mult = Scene.unit / Scene.main_camera.FOV
-        camera_ = Scene.main_camera
+        mult = Program.unit / Program.cur_scene.main_camera.FOV
+        camera_ = Program.cur_scene.main_camera
         camera_offset = Vector()
-        if self.on_scene and not self in Scene.ui:
-            print(not self in Scene.ui)
+        if self.on_scene and not self in Program.cur_scene.ui:
             camera_offset = camera_.position
         
-        x1, y1 = (self.position.x - self.scale.x/2 - camera_offset.x) * mult + Scene.width//2, (self.position.y - self.scale.y/2 - camera_offset.y) * mult + Scene.height//2
-        x2, y2 = (self.position.x + self.scale.x/2 - camera_offset.x) * mult + Scene.width//2, (self.position.y + self.scale.y/2 - camera_offset.y) * mult + Scene.height//2
-        self.ids.append(Scene.canvas.create_rectangle(x1, y1, x2, y2, fill = color, outline = self.outline_color, width = self.outline_width))
-        x, y = (self.position.x - camera_offset.x) * mult + Scene.width//2, (self.position.y - camera_offset.y) * mult + Scene.height//2
-        self.ids.append(Scene.canvas.create_text(x, y, text = self.text, fill = self.text_color, font = ('Times', int(0.35 * Scene.unit))))
+        x1, y1 = (self.global_position.x - self.scale.x/2 - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.global_position.y - self.scale.y/2 - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        x2, y2 = (self.global_position.x + self.scale.x/2 - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.global_position.y + self.scale.y/2 - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        self.ids.append(Program.cur_scene.canvas.create_rectangle(x1, y1, x2, y2, fill = color, outline = self.outline_color, width = self.outline_width))
+        x, y = (self.global_position.x - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.global_position.y - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        self.ids.append(Program.cur_scene.canvas.create_text(x, y, text = self.text, fill = self.text_color, font = ('Times', int(0.35 * Program.unit))))
     def class_update(self):
-        mouse_x, mouse_y = InputManager.mousePos(False)
-        if InputManager.getMouseButton(0):
+        mouse_x, mouse_y = Input.mouse_pos(False)
+        if Input.mouse_button(0):
             if self.clicked:
                 self.whileclicked(self)
             else:
@@ -949,24 +948,24 @@ class InputField(Entity):
         text = self.text
         if self.selected:
             text = self.text[:self.cursor] + "|" + self.text[self.cursor:]
-        # mouse_x, mouse_y = InputManager.mousePos()
+        # mouse_x, mouse_y = Input.mouse_pos()
         # if self.clicked and self.position.x - self.scale.x/2 < mouse_x < self.position.x + self.scale.x/2 and self.position.y - self.scale.y/2 < mouse_y < self.position.y + self.scale.y/2:
         #     color = self.highlight_color
         
-        mult = Scene.unit / Scene.main_camera.FOV
-        camera_ = Scene.main_camera
+        mult = Program.unit / Program.cur_scene.main_camera.FOV
+        camera_ = Program.cur_scene.main_camera
         camera_offset = Vector()
         if self.on_scene:
             camera_offset = camera_.position
         
-        x1, y1 = (self.position.x - self.scale.x/2 - camera_offset.x) * mult + Scene.width//2, (self.position.y - self.scale.y/2 - camera_offset.y) * mult + Scene.height//2
-        x2, y2 = (self.position.x + self.scale.x/2 - camera_offset.x) * mult + Scene.width//2, (self.position.y + self.scale.y/2 - camera_offset.y) * mult + Scene.height//2
-        self.ids.append(Scene.canvas.create_rectangle(x1, y1, x2, y2, fill = color, outline = self.outline_color))
-        x, y = (self.position.x - camera_offset.x) * mult + Scene.width//2, (self.position.y - camera_offset.y) * mult + Scene.height//2
-        self.ids.append(Scene.canvas.create_text(x, y, text = text, fill = self.text_color, font = ('Times', int(0.35 * Scene.unit))))
+        x1, y1 = (self.global_position.x - self.scale.x/2 - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.global_position.y - self.scale.y/2 - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        x2, y2 = (self.global_position.x + self.scale.x/2 - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.global_position.y + self.scale.y/2 - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        self.ids.append(Program.cur_scene.canvas.create_rectangle(x1, y1, x2, y2, fill = color, outline = self.outline_color))
+        x, y = (self.position.x - camera_offset.x) * Program.cur_scene.mult + Program.width//2, (self.position.y - camera_offset.y) * Program.cur_scene.mult + Program.height//2
+        self.ids.append(Program.cur_scene.canvas.create_text(x, y, text = text, fill = self.text_color, font = ('Times', int(0.35 * Program.unit))))
         
-        # Scene.canvas.create_rectangle((self.position.x - self.scale.x/2) * Scene.unit + Scene.width//2, (self.position.y - self.scale.y/2) * Scene.unit + Scene.height//2, (self.position.x + self.scale.x/2) * Scene.unit + Scene.width//2, (self.position.y + self.scale.y/2) * Scene.unit + Scene.height//2, fill = color, outline = self.outline_color)#, width = self.outline_width
-        # Scene.canvas.create_text(self.position.x * Scene.unit + Scene.width//2, self.position.y * Scene.unit + Scene.height//2, text = text, fill = self.text_color, font = ('Times', int(0.35 * Scene.unit)))
+        # Program.cur_scene.canvas.create_rectangle((self.position.x - self.scale.x/2) * Program.unit + Program.width//2, (self.position.y - self.scale.y/2) * Program.unit + Program.height//2, (self.position.x + self.scale.x/2) * Program.unit + Program.width//2, (self.position.y + self.scale.y/2) * Program.unit + Program.height//2, fill = color, outline = self.outline_color)#, width = self.outline_width
+        # Program.cur_scene.canvas.create_text(self.position.x * Program.unit + Program.width//2, self.position.y * Program.unit + Program.height//2, text = text, fill = self.text_color, font = ('Times', int(0.35 * Program.unit)))
     def pressed(self, key):
         if self.selected:
             if key.name == "space":
@@ -987,8 +986,8 @@ class InputField(Entity):
                 self.text = self.text[:self.cursor] + key.name + self.text[self.cursor:]
                 self.cursor+=1
     def class_update(self):
-        mouse_x, mouse_y = InputManager.mousePos(False)
-        if InputManager.getMouseButton(0):
+        mouse_x, mouse_y = Input.mouse_pos(False)
+        if Input.mouse_button(0):
             if self.position.x - self.scale.x/2 < mouse_x < self.position.x + self.scale.x/2 and self.position.y - self.scale.y/2 < mouse_y < self.position.y + self.scale.y/2:
                 self.selected = True
             else: self.selected = False                
@@ -1013,9 +1012,9 @@ class ParticleSystem(Entity):
         self.particles = []
     def class_update(self):
         for particle in self.particles:
-            if time() - particle.lifestart >= particle.lifetime or not particle in Scene.all_entities:
+            if time() - particle.lifestart >= particle.lifetime or not particle in Program.cur_scene.all_entities:
                 self.particles.pop(self.particles.index(particle))
-                if particle in Scene.all_entities:
+                if particle in Program.cur_scene.all_entities:
                     particle.destroy()
                 continue
             self.particle_update(particle)
@@ -1033,7 +1032,7 @@ class ParticleSystem(Entity):
         for i in range(spawn_num):
             angle = Random.percent(self.spawn_angle) - self.spawn_angle/2 - self.rotation
             dist = Random.percent(spawn_range)
-            pos = self.position + Vector(dist * sin(angle), dist * cos(angle))
+            pos = self.global_position + Vector(dist * sin(angle), dist * cos(angle))
             particle = Circle(pos=pos, radius=size, color=color)
             random_force = self.particle_force
             if type(random_force) in [tuple, list]:
@@ -1046,7 +1045,7 @@ class ParticleSystem(Entity):
             self.particles.append(particle)
 
 class Raycast:
-    def ray(self, start_point: Vector, dir: Vector, objects = Scene.all_entities):
+    def ray(self, start_point: Vector, dir: Vector, objects = Program.cur_scene.all_entities):
         '''
         :return: ray hit point
         '''
@@ -1098,14 +1097,11 @@ class Raycast:
                 u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den
                 if 1 > t > 0 and u > 0:
                     pt = Vector(x1 + t * (x2 - x1), y1 + t * (y2 - y1))
-                    # pt.x = 
-                    # pt.y = 
 
             elif other.collider_shape == 'circle':
                 dir2 = Vector(sign(dir.x)*dir.y, -sign(dir.x)*(dir.x))
                 line = Line(start=other.position - dir2*other.radius, end=other.position + dir2*other.radius, on_scene=True, color=Color.GREEN)
                 pt = raycaster.ray(start_point, dir, [line])
-                # print(line.start, line.end)
                 if pt:
                     angle = atan2(start_point.y - other.position.y, other.position.x - start_point.x)
                     distance = sqrt(abs(other.radius**2 - Vector.distance(other.position, pt)**2))
@@ -1126,13 +1122,45 @@ class Raycast:
         if last_pt:
             last_pt.x *= -1
             # pt = last_pt
-            # Scene.canvas.create_oval(pt.x * Scene.unit - 5 + Scene.width//2, pt.y * Scene.unit - 5 + Scene.height//2, pt.x * Scene.unit + 5 + Scene.width//2, pt.y * Scene.unit + 5 + Scene.height//2, fill = 'yellow')
+            # Program.cur_scene.canvas.create_oval(pt.x * Program.unit - 5 + Program.width//2, pt.y * Program.unit - 5 + Program.height//2, pt.x * Program.unit + 5 + Program.width//2, pt.y * Program.unit + 5 + Program.height//2, fill = 'yellow')
         
         return last_pt
 
-window_bounds = Polygon(scale=Scene.getWindowSize(True), on_scene=False, static=True)
+_ti_init = False
+
+@ti.data_oriented
+class Shader:
+    def __init__(self, pos: Vector, scale: Vector, fragment = None, color_size = 3):
+        global _ti_init
+        if not _ti_init: ti.init(ti.cuda); _ti_init = True
+        self.position = pos
+        self.scale = Vector(scale.y, scale.x).int()
+        self.fragment = fragment
+        self.field = ti.Vector.field(color_size, ti.uint8, self.scale.tuple())
+        self.data = []
+        self.usable = True
+        Program.cur_scene.all_entities.append(self)
+    @ti.kernel
+    def render_fragments(self, cur_time: ti.float32):
+        resol = ts.vec2(self.scale.x, self.scale.y)
+        for frag_coord in ti.grouped(self.field):
+            uv = frag_coord / resol
+            col = self.fragment(frag_coord, uv, cur_time)
+            self.field[frag_coord.x, resol.y - frag_coord.y] = col * 255
+    def update(self):
+        if self.fragment:
+            self.render_fragments(Time.running())
+        self.image = Image_.fromarray(self.field.to_numpy())
+        self.draw()
+    def draw(self):
+        mult = Program.unit / Program.cur_scene.main_camera.FOV
+        x, y = (self.position.x) * Program.cur_scene.mult + Program.width//2, (self.position.y) * Program.cur_scene.mult + Program.height//2
+        self.draw_image = ImageTk.PhotoImage(self.image)
+        Program.cur_scene.canvas.create_image(x, y, image=self.draw_image)
+
+window_bounds = Polygon(scale=Program.getWindowSize(True), on_scene=False, static=True)
 raycaster = Raycast()
-InputManager.initialisate()
+Input.initialisate()
 
 left = Vector(-1, 0)
 right = Vector(1, 0)
