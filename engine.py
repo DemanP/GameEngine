@@ -217,6 +217,8 @@ class scene:
         
         # Calling given update function
         update()
+        
+        # sleep(1)
                 
         try:
             Program.update_window()
@@ -1056,14 +1058,17 @@ class Raycast:
         y4 = start_point.y + dir.y
 
         last_pt = None
-
+        last_dist = None
+        
         for other in objects:
+            pt = None
+            if other.collider_shape == None: continue
             if other.collider_shape == 'polygon':
-                for i, v1 in enumerate(other.verticies):
+                for i, v1 in enumerate(other.collider_verticies):
                     x1 = -(v1.x + other.position.x)
                     y1 = v1.y + other.position.y
-                    x2 = -(other.verticies[(i+1) % len(other.verticies)].x + other.position.x)
-                    y2 = other.verticies[(i+1) % len(other.verticies)].y + other.position.y
+                    x2 = -(other.collider_verticies[(i+1) % len(other.collider_verticies)].x + other.position.x)
+                    y2 = other.collider_verticies[(i+1) % len(other.collider_verticies)].y + other.position.y
 
 
                     den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
@@ -1072,18 +1077,22 @@ class Raycast:
 
                     t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den
                     u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den
-                    if 1 > t > 0 and u > 0:
+                    # print(t, u)
+                    if 1 >= t >= 0 and u > 0:
                         pt = Vector()
-                        pt.x = x1 + t * (x2 - x1)
+                        pt.x = -(x1 + t * (x2 - x1))
                         pt.y = y1 + t * (y2 - y1)
+                        # print('aaaaaaa')
 
-                        # dist = hypot(pt.x - x3, pt.y - y3)
-                        # if not last_pt:
-                        #     last_pt = pt
-                        #     last_dist = dist
-                        # elif dist < last_dist:
-                        #     last_dist = dist
-                        #     last_pt = pt
+                        dist = hypot(pt.x - start_point.x, pt.y - start_point.y)
+                        # print(dist)
+                        
+                        if not last_pt:
+                            last_pt = pt
+                            last_dist = dist
+                        elif dist < last_dist:
+                            last_dist = dist
+                            last_pt = pt
             elif other.collider_shape == "line":
                 x1 = -other.start.x
                 y1 = other.start.y
@@ -1097,7 +1106,6 @@ class Raycast:
                 u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den
                 if 1 > t > 0 and u > 0:
                     pt = Vector(x1 + t * (x2 - x1), y1 + t * (y2 - y1))
-
             elif other.collider_shape == 'circle':
                 dir2 = Vector(sign(dir.x)*dir.y, -sign(dir.x)*(dir.x))
                 line = Line(start=other.position - dir2*other.radius, end=other.position + dir2*other.radius, on_scene=True, color=Color.GREEN)
@@ -1109,20 +1117,22 @@ class Raycast:
                 # if hypot(other.position.x - start_point.x, other.position.y - start_point.y) <= other.radius:
                 #     angle = atan2(start_point.y - other.position.y, start_point.x - other.position.x)
                 #     pt = Vector(-cos(angle) * other.radius + other.position.x, -sin(angle) * other.radius + other.position.y)
-            
-            try:
-                dist = hypot(pt.x - x3, pt.y - y3)
-                if not last_pt:
-                    last_pt = pt
-                    last_dist = dist
-                elif dist < last_dist:
-                    last_dist = dist
-                    last_pt = pt
-            except: pass
-        if last_pt:
-            last_pt.x *= -1
-            # pt = last_pt
-            # Program.cur_scene.canvas.create_oval(pt.x * Program.unit - 5 + Program.width//2, pt.y * Program.unit - 5 + Program.height//2, pt.x * Program.unit + 5 + Program.width//2, pt.y * Program.unit + 5 + Program.height//2, fill = 'yellow')
+            # print(pt)
+            # if pt != None:
+            #     dist = hypot(pt.x - start_point.x, pt.y - start_point.y)
+            #     print(dist)
+                
+            #     if not last_pt:
+            #         last_pt = pt
+            #         last_dist = dist
+            #     elif dist < last_dist:
+            #         last_dist = dist
+            #         last_pt = pt
+        # if last_pt:
+        #     last_pt.x *= -1
+        # if pt:
+        #     pt = last_pt
+        #     Program.cur_scene.canvas.create_oval(pt.x * Program.unit - 5 + Program.width//2, pt.y * Program.unit - 5 + Program.height//2, pt.x * Program.unit + 5 + Program.width//2, pt.y * Program.unit + 5 + Program.height//2, fill = 'yellow')
         
         return last_pt
 
@@ -1130,7 +1140,7 @@ _ti_init = False
 
 @ti.data_oriented
 class Shader:
-    def __init__(self, pos: Vector, scale: Vector, fragment = None, color_size = 3):
+    def __init__(self, pos: Vector, scale: Vector, fragment = _empty, color_size = 3):
         global _ti_init
         if not _ti_init: ti.init(ti.cuda); _ti_init = True
         self.position = pos
@@ -1157,6 +1167,50 @@ class Shader:
         x, y = (self.position.x) * Program.cur_scene.mult + Program.width//2, (self.position.y) * Program.cur_scene.mult + Program.height//2
         self.draw_image = ImageTk.PhotoImage(self.image)
         Program.cur_scene.canvas.create_image(x, y, image=self.draw_image)
+class LightShader(Shader):
+    '''!!!TESTING ENTITY!!!'''
+    def __init__(self, pos: Vector, radius, color_size=4):
+        scale = Vector(2, 2) * radius
+        self.radius = radius
+        # self.pixel_position = self.
+        super().__init__(pos, scale, self.lightning, color_size)
+    def lightning(self, pos, uv, cur_time):
+        vec_dist = uv - ts.vec2(.5, .5)
+        dist = (vec_dist.x ** 2 + vec_dist.y ** 2)**0.5 + .5
+        color = ts.vec4(1, 1, 1, 1-dist)
+        return color        
+
+class Light(Polygon):
+    def __init__(self, pos=copy(Vector(0, 0)), rot=0, radius = 2, color: str = Color.WHITE, outline_color='', outline_width=1, tag=None, mass=5, drawable=True, usable=True, on_scene=True, entity_update=_empty, entity_class=None, static=False):
+        scale = Vector(radius, radius)
+        self.radius = radius
+        super().__init__(pos, rot, scale, color, outline_color, outline_width, tag, mass, drawable, usable, on_scene, entity_update, entity_class, static)
+    def class_update(self):
+        self.verticies = []
+        # self.drawable = False
+        for angle in range(360):
+            # angle -= 180
+            angle = radians(angle)
+            entities = copy(Program.cur_scene.all_entities)
+            entities.pop(Program.cur_scene.all_entities.index(self))
+            direct = Vector(sin(angle), cos(angle)).normalised()
+            hit = raycaster.ray(self.position, direct, entities)
+            if not hit or Vector.distance(hit, self.position) > self.radius:
+                hit = Vector(sin(angle), cos(angle)) * self.radius
+            else:
+                hit -= self.position
+            self.verticies.append(hit)
+        # for i, vert in enumerate(self.verticies):
+        #     start = vert + self.position
+        #     end = self.verticies[(i+1)%len(self.verticies)] + self.position
+        #     x1, y1 = start.x * Program.cur_scene.mult + Program.width//2, start.y * Program.cur_scene.mult + Program.height//2
+        #     x2, y2 = end.x * Program.cur_scene.mult + Program.width//2, end.y * Program.cur_scene.mult + Program.height//2
+                       
+        #     Program.cur_scene.canvas.create_line(x1, y1, x2, y2, width = 2, fill = self.color)
+            
+        #     pt = vert + self.position
+        #     Program.cur_scene.canvas.create_oval(pt.x * Program.unit - 5 + Program.width//2, pt.y * Program.unit - 5 + Program.height//2, pt.x * Program.unit + 5 + Program.width//2, pt.y * Program.unit + 5 + Program.height//2, fill = 'yellow')
+                        
 
 window_bounds = Polygon(scale=Program.getWindowSize(True), on_scene=False, static=True)
 raycaster = Raycast()
